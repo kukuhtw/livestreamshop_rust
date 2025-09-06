@@ -1,43 +1,49 @@
-Here’s a clean and professional **README.md** draft for your `livestreamshop_rust` repo:
-
----
-
 # 📺 LiveStreamShop (Rust)
 
-**LiveStreamShop** is an open-source **web-based live streaming shopping application** built with **Rust**.
-It enables sellers to host live streams on their own website, interact with buyers in real time, and integrate shopping carts and checkout features seamlessly.
+**LiveStreamShop** adalah aplikasi live streaming shopping berbasis web yang bersifat open-source, dibangun dengan **Rust**.
+Menawarkan platform mandiri bagi penjual: live stream di situs Anda sendiri, interaksi real-time dengan pembeli melalui chat, serta integrasi keranjang belanja langsung dalam sesi—semua dalam satu alur yang mulus.
 
 ---
 
-## ✨ Why LiveStreamShop?
+## Why LiveStreamShop?
 
-Many sellers today rely heavily on platforms like TikTok or Shopee for live commerce. This project offers an **independent alternative**—a self-owned platform where sellers maintain **full control** over their data, branding, and buyer interactions.
-
----
-
-## 🔑 Key Features
-
-* 🎥 **Live Streaming**: Host live sales sessions directly from your website.
-* 💬 **Real-time Chat**: Engage and answer buyer questions instantly.
-* 🛒 **Integrated Shopping Cart**: Smooth transition from product demo to purchase.
-* 🔐 **Data Ownership**: Sellers fully control data and customer interactions.
-* 🌐 **Open Source & Customizable**: Modify and brand it for your business.
-* 🚀 **Powered by Rust**: Fast, safe, and scalable performance.
+Sebelumnya, banyak penjual bergantung pada platform seperti TikTok atau Shopee untuk live commerce. LiveStreamShop hadir sebagai **alternatif mandiri**—penjual tetap pegang kendali penuh atas data, branding, dan interaksi dengan pembeli.
 
 ---
 
-## 🛠️ Tech Stack
+## Fitur Utama
+
+* 🎥 Live Streaming langsung dari website.
+* Chat real-time untuk interaksi langsung pembeli.
+* Keranjang & checkout terintegrasi selama live.
+* Kepemilikan data ditangani sepenuhnya oleh penjual.
+* Kode open-source—mudah dikustomisasi dan diberi branding.
+* Dibangun dengan Rust untuk performa cepat dan aman.
+
+---
+
+## Demo Video
+
+Lihat demo penggunaan LiveStreamShop langsung di video berikut yang menunjukkan alur live streaming dengan chat, interaksi, hingga proses checkout:
+
+[LiveStreamShop Rust Demo]()
+
+*(Catatan: jika video gagal memuat, coba akses langsung di YouTube dengan tautan `https://www.youtube.com/watch?v=oojtmtgQ1vI`.)*
+
+---
+
+## Tech Stack
 
 * **Backend**: Rust (Axum, Tokio, SQLx)
 * **Frontend**: HTML, CSS, JavaScript
-* **Database**: MySQL / PostgreSQL (planned)
-* **Video**: WebRTC / Media APIs (planned)
+* **Database**: MySQL / PostgreSQL (direncanakan)
+* **Video**: WebRTC / Media APIs (direncanakan)
 
 ---
 
-## 🚀 Getting Started
+## Mulai Cepat
 
-### 1. Clone the Repository
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/kukuhtw/livestreamshop_rust.git
@@ -46,46 +52,88 @@ cd livestreamshop_rust
 
 ### 2. Setup Environment
 
-Create a `.env` file with your database & config:
+Tambahkan file `.env` dengan konfigurasi seperti:
 
 ```env
 DATABASE_URL=mysql://user:password@localhost/livestreamshop
 RUST_LOG=info
 ```
 
-### 3. Run the Server
+### 3. Jalankan Server
 
 ```bash
 cargo run
 ```
 
-Server runs at: [http://localhost:3030](http://localhost:3030)
+Akses server di: [http://127.0.0.1:3030](http://127.0.0.1:3030)
+
+### 4. Buat Admin Pertama
+
+Buka halaman berikut untuk membuat akun admin pertama:
+[http://127.0.0.1:3030/static/setupadmin.html](http://127.0.0.1:3030/static/setupadmin.html)
 
 ---
 
-## 🤝 Contributing
+## Struktur Proyek
 
-Contributions are welcome!
-
-* Fork the repo
-* Create a feature branch
-* Submit a pull request
+```
+livestreamshop_rust/
+├── assets/
+│   └── haarcascade_frontalface_default.xml  # XML deteksi wajah untuk fitur video di masa depan
+│
+├── server/
+│   ├── src/
+│   │   ├── handlers/
+│   │   │   ├── admin.rs        # Rute & logika admin
+│   │   │   ├── cart.rs         # Logika keranjang belanja
+│   │   │   ├── mod.rs          # Modul routing
+│   │   │   ├── orders.rs       # Manajemen pesanan
+│   │   │   ├── products.rs     # Produk & katalog
+│   │   │   └── users.rs        # Autentikasi & profil pengguna
+│   │   └── main.rs             # Entrypoint server
+│   ├── .env                   # Konfigurasi environment
+│   ├── Cargo.toml             # Metadata & dependensi Rust
+│   └── Cargo.lock             # Lockfile otomatis
+│
+├── uploads/                    # Folder penyimpanan file upload (gambar/video)
+│
+├── webapp/
+│   └── uploads/
+│       ├── admin.html          # UI dashboard admin
+│       ├── index.html          # Halaman utama
+│       ├── index.js            # Logika frontend
+│       ├── livepage.html       # Halaman live streaming
+│       ├── setupadmin.html     # Halaman setup admin pertama
+│       └── viewer.html         # Halaman viewer/pembeli
+│
+├── LICENSE                     # Lisensi (MIT, dsb.)
+├── mysignaturee.txt            # Informasi penanda tangan penulis
+└── README.md                   # Dokumentasi proyek
+```
 
 ---
 
-## 📬 Contact
+## Kontribusi
+
+Kontribusi sangat disambut!
+
+* Fork repositori ini
+* Buat branch fitur
+* Submit pull request
+
+---
+
+## Kontak
 
 * **Author**: Kukuh Tripamungkas Wicaksono (Kukuh TW)
 * **Email**: [kukuhtw@gmail.com](mailto:kukuhtw@gmail.com)
-* **WhatsApp**: [Chat here](https://wa.me/628129893706)
-* **LinkedIn**: [Profile](https://id.linkedin.com/in/kukuhtw)
+* **WhatsApp**: [Chat sekarang](https://wa.me/628129893706)
+* **LinkedIn**: [Profil](https://id.linkedin.com/in/kukuhtw)
 
 ---
 
-## ⚖️ License
+## Lisensi
 
-This project is licensed under the **MIT License** – feel free to use, modify, and share.
+Proyek ini dilisensikan di bawah **Apache 2.0 License**—bebas digunakan, modifikasi, dan disebarkan.
 
----
-
-Do you want me to also make a **shorter GitHub-friendly version** (like under 1000 chars, concise for the repo frontpage), or keep it as this detailed full README?
+-
