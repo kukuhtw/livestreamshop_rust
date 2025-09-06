@@ -1,0 +1,90 @@
+<!--  webapp/livepage.html  -->
+<!-- webapp/livepage.html -->
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Live</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; }
+    .main { display:flex; flex-direction:column; gap: 12px; max-width: 960px; margin:auto; }
+    #frame { width: 100%; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.15); background:#111; }
+    .chat { border:1px solid #ddd; border-radius:12px; display:flex; flex-direction:column; max-height:60vh; }
+    #log { flex:1; padding:10px; overflow:auto; font-size:14px; }
+    #form { display:flex; gap:6px; padding:8px; border-top:1px solid #eee; }
+    #form input { flex:1; padding:8px; border-radius:999px; border:1px solid #ddd }
+    #form button { padding:8px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; cursor:pointer }
+    .me { color:#2c7; }
+    .sys { color:#888; font-style:italic }
+  </style>
+</head>
+<body>
+  <div class="main">
+    <div>
+      <h2 id="roomTitle">Room:</h2>
+      <img id="frame" alt="stream akan muncul di sini">
+      <div style="margin-top:8px; color:#666">Bagikan tautan ini: <b id="link"></b></div>
+    </div>
+    <div class="chat">
+      <div id="log"></div>
+      <form id="form">
+        <input id="name" placeholder="Nama" required>
+        <input id="msg" placeholder="Tulis pesan..." required>
+        <button>Kirim</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function getRoom(){
+      const u = new URL(location.href);
+      const q = u.searchParams.get('room');
+      if (q) return q.replace(/[^\w-]/g,'');
+      const m = location.pathname.match(/\/live\/([^\/?#]+)/);
+      return (m ? m[1] : 'main').replace(/[^\w-]/g,'');
+    }
+    const room = getRoom();
+    document.getElementById('roomTitle').textContent = 'Room: ' + room;
+    const link = document.getElementById('link'); link.textContent = location.href;
+
+    fetch('/api/ensure-viewer', { method:'POST', credentials:'include' })
+      .then(()=> startWS())
+      .catch(()=> location.href='/static/index.html');
+
+    function addLine(text, cls=''){
+      const log = document.getElementById('log');
+      const p = document.createElement('div'); p.textContent = text;
+      if (cls) p.className = cls; log.appendChild(p); log.scrollTop = log.scrollHeight;
+    }
+
+    function startWS(){
+      const origin = location.origin.replace(/^http/,'ws');
+      const ws = new WebSocket(`${origin}/ws/${room}`);
+      const frame = document.getElementById('frame');
+      ws.addEventListener('open', () => addLine('Terhubung ke streaming…', 'sys'));
+      ws.addEventListener('close', () => addLine('Koneksi terputus.', 'sys'));
+      ws.send(JSON.stringify({ t:'sys', text:'viewer_enter' }));
+
+      ws.addEventListener('message', ev => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.t === 'f') frame.src = msg.d;
+          else if (msg.t === 'c') addLine((msg.user||'anon') + ': ' + msg.text);
+          else if (msg.t === 'sys') addLine(msg.text, 'sys');
+        } catch (_) {}
+      });
+
+      document.getElementById('form').addEventListener('submit', e => {
+        e.preventDefault();
+        const name = document.getElementById('name').value.trim() || 'viewer';
+        const text = document.getElementById('msg').value.trim();
+        if (!text) return;
+        ws.send(JSON.stringify({ t:'c', room, user:name, text }));
+        addLine('(me) ' + name + ': ' + text, 'me');
+        document.getElementById('msg').value = '';
+      });
+    }
+  </script>
+</body>
+</html>

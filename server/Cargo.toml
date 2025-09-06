@@ -1,0 +1,42 @@
+[package]
+name = "live_stream_shop"
+version = "0.1.0"
+edition = "2021"
+description = "Live Stream Shop server (Axum + MySQL + WebSocket)"
+license = "MIT"
+publish = false
+
+[dependencies]
+# Axum
+axum = { version = "0.7", features = ["ws", "multipart"] }   # <- enable ws + multipart
+axum-extra = { version = "0.9", features = ["cookie"] }
+tower-http = { version = "0.5", features = ["fs"] }          # <- NOT "serve-dir"
+
+# Async/runtime
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs"] }
+futures-util = "0.3"
+
+# Env + error
+dotenvy = "0.15"
+anyhow = "1"
+
+# Cookies (for SameSite)
+cookie = "0.18"
+
+# Serde/uuid/crypto/time
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+argon2 = "0.5"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+
+# SQLx
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "mysql", "chrono"] }
+
+rust_xlsxwriter = "0.64"
+
+password-hash = "0.5"
+
+
+

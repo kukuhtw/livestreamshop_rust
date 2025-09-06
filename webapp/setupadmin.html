@@ -1,0 +1,139 @@
+<!-- webapp/setupadmin.html -->
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Setup Admin Pertama — Live Shop</title>
+  <style>
+    :root { --bd:#ddd; --muted:#666; }
+    body { font-family: system-ui, sans-serif; margin: 24px; background:#fafafa; }
+    .card { max-width: 560px; margin: 0 auto; border:1px solid var(--bd); border-radius:14px; padding:18px; background:#fff; }
+    h1 { font-size: 22px; margin: 0 0 12px; }
+    p.muted { color: var(--muted); margin-top: 4px; }
+    .field { display:flex; flex-direction:column; gap:6px; margin:10px 0; }
+    .field input { padding:10px; border:1px solid var(--bd); border-radius:10px; }
+    .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+    .btn { padding:10px 14px; border:1px solid var(--bd); border-radius:999px; background:#fff; cursor:pointer; }
+    .btn[disabled]{ opacity:.5; cursor:not-allowed; }
+    .ok { color:#2c7; }
+    .err { color:#c33; }
+    .hidden { display:none !important; }
+    .hint { font-size:13px; color: var(--muted); }
+    ul { margin:6px 0 0 18px; color:#555; }
+  </style>
+</head>
+<body>
+  <div class="card" id="wrap">
+    <h1>Setup Admin Pertama</h1>
+    <p class="muted">Halaman ini hanya untuk inisialisasi akun admin pertama. Setelah admin dibuat, halaman akan dinonaktifkan (redirect) otomatis.</p>
+
+    <div id="already" class="hidden">
+      <p class="ok"><b>Admin sudah terpasang.</b> Mengarahkan ke dashboard…</p>
+    </div>
+
+    <form id="form" autocomplete="off">
+      <div class="field">
+        <label>Nama Lengkap</label>
+        <input id="name" placeholder="Nama admin" required />
+      </div>
+      <div class="field">
+        <label>Email (dipakai sebagai username)</label>
+        <input id="email" type="email" placeholder="admin@domain.com" required />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="pass" type="password" placeholder="Minimal 8 karakter" required />
+        <div class="hint">Saran: minimal 8 karakter, kombinasi huruf besar/kecil, angka, dan simbol.</div>
+      </div>
+      <div class="field">
+        <label>Ulangi Password</label>
+        <input id="pass2" type="password" placeholder="Ulangi password" required />
+      </div>
+      <div class="bar">
+        <button class="btn" id="btnSetup" type="submit">Buat Admin</button>
+        <span id="hint" class="hint"></span>
+      </div>
+    </form>
+  </div>
+
+  <script>
+  (async function(){
+    const el = sel => document.querySelector(sel);
+    const form = el('#form');
+    const hint = el('#hint');
+    const already = el('#already');
+
+    // Cek apakah admin sudah ada → nonaktifkan halaman dengan redirect
+    try {
+      const r = await fetch('/api/admin/exists');
+      if (r.ok) {
+        const j = await r.json();
+        if (j.exists) {
+          form.classList.add('hidden');
+          already.classList.remove('hidden');
+          setTimeout(()=> location.href = '/static/admin.html', 1000);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      hint.textContent = '';
+
+      const name  = el('#name').value.trim();
+      const email = el('#email').value.trim();
+      const pass  = el('#pass').value;
+      const pass2 = el('#pass2').value;
+
+      if (!name || !email || !pass || !pass2) {
+        hint.textContent = 'Semua kolom wajib diisi.'; return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        hint.textContent = 'Format email tidak valid.'; return;
+      }
+      if (pass.length < 8) {
+        hint.textContent = 'Password minimal 8 karakter.'; return;
+      }
+      if (pass !== pass2) {
+        hint.textContent = 'Password tidak sama.'; return;
+      }
+
+      el('#btnSetup').disabled = true;
+
+      // Coba bootstrap admin
+      const r = await fetch('/api/admin/bootstrap', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ username: email, password: pass, name })
+      });
+
+      if (r.ok) {
+        // Login otomatis lalu redirect ke dashboard
+        const r2 = await fetch('/api/admin/login', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ username: email, password: pass })
+        });
+        if (r2.ok) {
+          hint.textContent = 'Berhasil. Mengarahkan ke dashboard…';
+          setTimeout(()=> location.href = '/static/admin.html', 600);
+        } else {
+          hint.textContent = 'Berhasil membuat admin. Silakan login di /static/admin.html';
+          setTimeout(()=> location.href = '/static/admin.html', 800);
+        }
+      } else {
+        const msg = await r.text().catch(()=> 'Gagal membuat admin.');
+        hint.textContent = msg === 'Admin already exists' ? 'Admin sudah ada. Mengarahkan…' : msg;
+        if (msg === 'Admin already exists') {
+          setTimeout(()=> location.href = '/static/admin.html', 800);
+        } else {
+          el('#btnSetup').disabled = false;
+        }
+      }
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!-- webapp/index.html -->
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Live Shop — Registrasi Viewer</title>
+  <style>
+    :root { --bd:#ddd; --muted:#666; --card:#fff; --bg:#f7f7f8; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: var(--bg); color:#111; }
+    header { padding: 18px; background:#fff; border-bottom:1px solid var(--bd); display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; z-index:10; }
+    header .brand { font-weight:700; }
+    header nav a { color:#111; text-decoration:none; border:1px solid var(--bd); padding:8px 12px; border-radius:999px; background:#fff; }
+    main { max-width: 980px; margin: 24px auto; padding: 0 16px; display:grid; grid-template-columns:1fr; gap:16px; }
+    @media(min-width:960px){ main { grid-template-columns: 1.3fr .7fr; } }
+    .card { background: var(--card); border:1px solid var(--bd); border-radius:14px; padding:16px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 0 0 8px; font-size: 20px; }
+    p.muted, .muted { color: var(--muted); }
+    .field { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
+    .field label { font-size: 13px; color:#333; }
+    .field input, .field select, .field textarea {
+      padding: 10px 12px; border:1px solid var(--bd); border-radius:10px; background:#fff; font-size:15px;
+    }
+    .phone-row { display:grid; grid-template-columns: 160px 1fr; gap:8px; }
+    .row { display:grid; grid-template-columns:1fr; gap:10px; }
+    @media(min-width:720px){ .row-2 { grid-template-columns:1fr 1fr; } }
+    .pill { padding:10px 14px; border:1px solid var(--bd); border-radius:999px; background:#111; color:#fff; cursor:pointer; font-weight:600; }
+    .pill.secondary { background:#fff; color:#111; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .hint { font-size: 13px; color:#666; }
+    .sep { height:1px; background:var(--bd); margin:12px 0; }
+    .prod-cta { display:flex; align-items:center; gap:8px; padding:10px; background:#fff; border:1px dashed var(--bd); border-radius:12px; }
+    .ok { color:#1e7c2e; font-weight:600; }
+    .err { color:#b00020; font-weight:600; }
+    footer { padding: 16px; text-align:center; color:#777; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">🛒 Live Shop</div>
+    <nav>
+      <a href="/static/viewer.html">Viewer</a>
+      <a href="/static/admin.html">Admin</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- LEFT: Registration + Join Live -->
+    <section class="card">
+      <h1>Mulai sebagai Viewer</h1>
+      <p class="muted">Isi data singkat di bawah untuk membuat sesi penonton secara otomatis. Setelah itu kamu bisa nonton Live dan belanja.</p>
+
+      <div id="status" class="hint"></div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>Nama Lengkap</label>
+          <input id="name" placeholder="Nama kamu" autocomplete="name" />
+        </div>
+        <div class="field">
+          <label>Email (opsional)</label>
+          <input id="email" placeholder="nama@email.com" type="email" autocomplete="email" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>No. WhatsApp</label>
+        <div class="phone-row">
+          <select id="cc">
+            <!-- Beberapa kode negara populer di Asia & global -->
+            <option value="+62" selected>🇮🇩 Indonesia (+62)</option>
+            <option value="+60">🇲🇾 Malaysia (+60)</option>
+            <option value="+65">🇸🇬 Singapore (+65)</option>
+            <option value="+66">🇹🇭 Thailand (+66)</option>
+            <option value="+63">🇵🇭 Philippines (+63)</option>
+            <option value="+84">🇻🇳 Vietnam (+84)</option>
+            <option value="+91">🇮🇳 India (+91)</option>
+            <option value="+81">🇯🇵 Japan (+81)</option>
+            <option value="+82">🇰🇷 South Korea (+82)</option>
+            <option value="+86">🇨🇳 China (+86)</option>
+            <option value="+1">🇺🇸 United States (+1)</option>
+            <option value="+44">🇬🇧 United Kingdom (+44)</option>
+            <option value="+61">🇦🇺 Australia (+61)</option>
+            <option value="+971">🇦🇪 UAE (+971)</option>
+            <option value="+92">🇵🇰 Pakistan (+92)</option>
+          </select>
+          <input id="phone" placeholder="81234567890" inputmode="numeric" autocomplete="tel" />
+        </div>
+        <div class="hint">Masukkan tanpa 0 di depan. Contoh: +62 <b>81234567890</b></div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="row">
+        <div class="field">
+          <label>Nama Room Live (opsional)</label>
+          <input id="room" placeholder="mis. main" />
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:6px;">
+        <button id="btnStart" class="pill">Buat Session & Lanjut</button>
+        <button id="btnOnlyProfile" class="pill secondary">Simpan Profil Saja</button>
+        <span id="inlineInfo" class="hint"></span>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="prod-cta">
+        <div>🎥 Setelah registrasi, kamu bisa:</div>
+        <div class="actions">
+          <a class="pill secondary" href="/static/viewer.html">Buka Halaman Viewer</a>
+          <button id="btnGoLive" class="pill secondary">Langsung ke LIVE</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Info & Admin -->
+    <aside class="card">
+      <h2>Admin Area</h2>
+      <p class="muted">Hanya admin yang dapat mengaktifkan kamera & mengelola katalog serta order.</p>
+      <div class="actions">
+        <a class="pill" href="/static/admin.html">Buka Dashboard Admin</a>
+      </div>
+
+      <div class="sep"></div>
+
+      <h2>Apa yang bisa kamu lakukan?</h2>
+      <ul style="margin:8px 0 0 18px; color:#333; line-height:1.6;">
+        <li>Nonton live streaming di /live/&lt;room&gt;</li>
+        <li>Lihat dan pilih produk</li>
+        <li>Tambah ke keranjang & checkout</li>
+        <li>Admin dapat upload foto produk & kelola order</li>
+      </ul>
+
+      <div class="sep"></div>
+
+      <div id="meBox" class="hint">Status sesi: <span id="meState">unknown</span></div>
+    </aside>
+  </main>
+
+  <footer>© Live Shop • build with Axum + MySQL</footer>
+
+  <script>
+  (async function(){
+    const el = (id)=>document.getElementById(id);
+    const status = el('status');
+    const inlineInfo = el('inlineInfo');
+    const meState = el('meState');
+
+    // Prefill jika sudah punya sesi
+    try {
+      const me = await (await fetch('/api/me')).json();
+      if (me && me.user) {
+        meState.textContent = 'aktif ('+me.user.role+')';
+        if (me.user.name)  el('name').value = me.user.name;
+        if (me.user.email) el('email').value = me.user.email || '';
+        if (me.user.phone) {
+          // coba parse prefix negara
+          const m = (me.user.phone+'').match(/^(\+\d{1,4})\s*(.*)$/);
+          if (m) { el('cc').value = m[1]; el('phone').value = (m[2]||'').replace(/\s+/g,''); }
+          else { el('phone').value = (me.user.phone+'').replace(/[^\d]/g,''); }
+        }
+        status.innerHTML = '<span class="ok">Sesi ditemukan.</span>';
+      } else {
+        meState.textContent = 'belum ada';
+      }
+    } catch {
+      meState.textContent = 'error mengambil sesi';
+    }
+
+    function sanitizePhoneLocal(n){ return String(n).replace(/[^\d]/g,''); }
+    function sanitizeRoom(r){ return String(r||'').replace(/[^a-zA-Z0-9_-]/g,''); }
+    function fullPhone(){
+      const cc = el('cc').value || '+62';
+      let num = sanitizePhoneLocal(el('phone').value);
+      // buang leading 0 agar jadi format internasional konsisten
+      if (num.startsWith('0')) num = num.replace(/^0+/, '');
+      return cc + ' ' + num;
+    }
+
+    async function ensureViewerSession(){
+      const r = await fetch('/api/ensure-viewer', { method:'POST' });
+      if (!r.ok) throw new Error('gagal ensure viewer');
+    }
+
+    async function saveProfile(){
+      const name  = el('name').value.trim();
+      const email = el('email').value.trim();
+      const phone = fullPhone();
+      if (!name) throw new Error('Nama wajib diisi');
+      if (!/\d{6,}/.test(phone)) throw new Error('Nomor WhatsApp tidak valid');
+      const r = await fetch('/api/user/profile', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name, email: email||null, phone })
+      });
+      if (!r.ok) throw new Error('Gagal menyimpan profil');
+    }
+
+    async function doRegisterFlow(){
+      inlineInfo.textContent = '';
+      status.textContent = '';
+      const room = sanitizeRoom(el('room').value || '');
+      try {
+        // 1) Pastikan ada session viewer
+        await ensureViewerSession();
+        // 2) Simpan profil user
+        await saveProfile();
+        status.innerHTML = '<span class="ok">Registrasi berhasil. Sesi aktif.</span>';
+        // 3) Arahkan
+        if (room) {
+          window.location.href = '/live/' + room;
+        } else {
+          window.location.href = '/static/viewer.html';
+        }
+      } catch (e) {
+        status.innerHTML = '<span class="err">'+(e.message || e)+'</span>';
+      }
+    }
+
+    async function saveOnly(){
+      inlineInfo.textContent = '';
+      try {
+        await ensureViewerSession();
+        await saveProfile();
+        inlineInfo.innerHTML = '<span class="ok">Profil disimpan.</span>';
+      } catch(e){
+        inlineInfo.innerHTML = '<span class="err">'+(e.message||e)+'</span>';
+      }
+    }
+
+    el('btnStart').addEventListener('click', doRegisterFlow);
+    el('btnOnlyProfile').addEventListener('click', saveOnly);
+    el('btnGoLive').addEventListener('click', ()=>{
+      const room = sanitizeRoom(el('room').value || 'main');
+      // Pastikan registrasi dulu
+      doRegisterFlow(); // flow sudah handle redirect ke /live/<room> jika field room terisi
+    });
+  })();
+  </script>
+</body>
+</html>

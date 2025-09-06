@@ -1,0 +1,618 @@
+<!-- webapp/admin.html -->
+<!-- webapp/admin.html -->
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Dashboard — Live Shop</title>
+  <style>
+    :root { --bd:#ddd; --muted:#666; }
+    body { font-family: system-ui, sans-serif; margin: 18px; background:#fafafa; }
+    .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    video, canvas { width: 720px; max-width:100%; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.15); background:#000; }
+    .pill { padding:8px 12px; border:1px solid var(--bd); border-radius:999px; background:#fff; cursor:pointer; }
+    .pill[disabled]{ opacity:.5; cursor:not-allowed; }
+    .led{ width:10px;height:10px;border-radius:50%;display:inline-block;margin-left:6px;background:#c0c0c0; }
+    .led.on{ background:#e74c3c; box-shadow:0 0 0 6px rgba(231,76,60,.15); }
+
+    .row > .card{ min-width:420px; scroll-snap-align:start; }
+    @media(max-width:600px){ .row > .card{ min-width:90vw; } }
+
+    .card { border:1px solid var(--bd); border-radius:12px; padding:12px; background:#fff; }
+    .grid { display:grid; gap:12px; }
+    .grid-2 { grid-template-columns:1fr; }
+    @media(min-width:900px){ .grid-2 { grid-template-columns:1fr 1fr; } }
+    .field { display:flex; flex-direction:column; gap:6px; }
+    .field input, .field textarea, .field select {
+      padding:8px; border:1px solid var(--bd); border-radius:8px; width:100%;
+    }
+    .table { width:100%; border-collapse:collapse; font-size:14px; }
+    .table th, .table td { border-top:1px solid var(--bd); padding:8px; text-align:left; vertical-align:top; }
+    .table th { background:#f6f6f6; }
+    .muted { color:var(--muted); }
+    .tag { font-size:12px; padding:2px 8px; border:1px solid var(--bd); border-radius:999px; }
+    .hidden { display:none !important; }
+    .thumb { width:64px; height:64px; object-fit:cover; border-radius:6px; background:#eee; }
+
+    /* Mobile tweaks */
+    @media(max-width: 600px){
+      .bar { gap:6px }
+      .pill { padding:10px 12px }
+      .table { font-size:13px }
+      .table th, .table td { padding:6px }
+      .itemsList { font-size:12px }
+    }
+
+    /* Highlight order baru */
+    @keyframes flashRow {
+      0%   { background: #fff8d8; }
+      50%  { background: #ffffff; }
+      100% { background: #fff8d8; }
+    }
+    tr.flash {
+      animation: flashRow 0.9s ease-in-out 4;
+    }
+
+    .itemsList { margin:0; padding-left:18px; }
+    .itemsList li { margin:2px 0; }
+
+    .toast { position:fixed; right:16px; bottom:16px; background:#111; color:#fff; padding:10px 14px; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:.96; z-index:9999; }
+#adminMenu:hover #adminDropdown { display:block !important; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+</head>
+<body>
+  <h1>Admin Dashboard — Live Shop</h1>
+
+  <div class="bar" id="soundBar">
+    <button id="btnEnableSound" class="pill">🔊 Aktifkan Suara</button>
+    <span class="muted">Suara: chat & order</span>
+  </div>
+
+  <!-- Login Card (shown if not admin) -->
+  <div class="card" id="adminLoginCard">
+    <h3>Admin Login</h3>
+    <div class="field"><label>Email</label><input id="adminUser" placeholder="admin@email" /></div>
+    <div class="field"><label>Password</label><input id="adminPass" type="password" placeholder="••••••••" /></div>
+    <div class="bar">
+      <button id="btnAdminLogin" class="pill">Login</button>
+      <span id="adminHint" class="muted"></span>
+    </div>
+  </div>
+
+  <!-- Dashboard (shown if admin) -->
+  <div id="adminDashWrap" class="hidden">
+
+    <div class="bar" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+  <div class="pill" id="viewerBadge" title="Realtime total viewers">
+    👀 Viewers: <b id="viewerCount">0</b>
+  </div>
+
+  <div class="pill" id="adminMenu" style="position:relative;user-select:none;">
+    <span>⚙️ Admin</span>
+    <div id="adminDropdown" class="hidden" style="position:absolute;right:0;top:40px;background:#fff;border:1px solid var(--bd);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.08);min-width:200px;overflow:hidden;">
+      <button class="pill" style="border:0;border-radius:0;width:100%;text-align:left" id="btnChangePass">🔒 Ganti Password</button>
+      <button class="pill" style="border:0;border-radius:0;width:100%;text-align:left;color:#e53935" id="btnLogout">🚪 Logout</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalPass" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:9998;">
+  <div class="card" style="width:min(520px,92vw)">
+    <h3>Ganti Password Admin</h3>
+    <div class="field"><label>Password lama</label><input id="oldPass" type="password" /></div>
+    <div class="field"><label>Password baru</label><input id="newPass" type="password" /></div>
+    <div class="field"><label>Ulangi password baru</label><input id="newPass2" type="password" /></div>
+    <div class="bar">
+      <button class="pill" id="btnPassSave">Simpan</button>
+      <button class="pill" id="btnPassClose">Tutup</button>
+      <span id="passHint" class="muted"></span>
+    </div>
+  </div>
+</div>
+
+
+    <div class="card">
+      <div class="bar">
+        <button id="btnStartStream" class="pill" disabled>Start Streaming</button>
+        <button id="btnStopStream" class="pill" disabled>Stop Streaming</button>
+        <span class="pill" id="shareBox" style="display:none">Share: <b id="shareLink"></b></span>
+      </div>
+      <div class="bar">
+        <button id="btnStartCam" class="pill" disabled>Aktifkan Kamera</button>
+        <button id="btnStartRec" class="pill" disabled>Mulai Rekam</button>
+        <button id="btnStopRec" class="pill" disabled>Stop & Download</button>
+        <label class="pill"><input type="checkbox" id="cbEnableFilter" checked /> Aktifkan Filter</label>
+        <select id="selFilter" class="pill">
+          <option value="anime" selected>Anime / Cartoon</option>
+          <option value="avatar">Avatar AI</option>
+          <option value="beautify">Beautify</option>
+          <option value="pixelate">Pixelate</option>
+          <option value="gray">Grayscale</option>
+          <option value="invert">Invert</option>
+          <option value="sepia">Sepia</option>
+          <option value="vignette">Vignette</option>
+        </select>
+        <select id="selBG" class="pill" title="Background style">
+          <option value="origin" selected>BG: Asli</option>
+          <option value="blur">BG: Blur</option>
+          <option value="gray">BG: Grayscale</option>
+          <option value="pixel">BG: Pixelate</option>
+          <option value="grad">BG: Gradient</option>
+        </select>
+        <span class="pill">REC <span id="led" class="led"></span></span>
+      </div>
+      <video id="video" playsinline autoplay muted></video>
+      <h3 style="margin:10px 0 6px">Output</h3>
+      <canvas id="canvas"></canvas>
+
+      <div id="hostChat" style="margin-top:12px;">
+        <div><b>Chat (host)</b></div>
+        <div id="hostLog" style="max-height:160px;overflow:auto;font-size:14px;margin:6px 0;border:1px solid #ddd;border-radius:10px;padding:8px;background:#fff;"></div>
+        <div style="display:flex;gap:6px;">
+          <input id="hostName" placeholder="Nama host" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:10px" />
+          <input id="hostMsg" placeholder="Tulis pesan…" style="flex:2;padding:8px;border:1px solid #ddd;border-radius:10px" />
+          <button id="btnHostSend" class="pill">Kirim</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <!-- Produk -->
+      <div class="card">
+        <h3>Produk</h3>
+        <div class="grid grid-2">
+          <div class="field"><label>Nama Barang</label><input id="aName" /></div>
+          <div class="field"><label>Harga (Rp)</label><input id="aPrice" type="number" /></div>
+          <div class="field" style="grid-column:1 / -1;">
+            <label>Deskripsi</label><textarea id="aDesc"></textarea>
+          </div>
+        </div>
+        <div class="bar">
+          <button id="btnCreateProd" class="pill">Tambah Produk</button>
+          <button id="btnReloadProd" class="pill">Reload</button>
+        </div>
+        <table class="table" id="adminProdTable">
+          <thead><tr><th>ID</th><th>Nama</th><th>Harga</th><th>Deskripsi</th><th>Foto</th><th>Aksi</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Orders -->
+      <div class="card">
+        <h3>Orders</h3>
+        <table class="table" id="adminOrderTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Customer</th>
+              <th>Alamat</th>
+              <th>Items</th> <!-- NEW -->
+              <th>Subtotal</th>
+              <th>Ongkir</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Aksi</th>
+              <th>WA</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        
+<div class="bar">
+  <button id="btnReloadOrders" class="pill">Reload Orders</button>
+  <button id="btnExportAll" class="pill">Export Semua (XLS)</button>
+</div>
+
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Script kamera/streaming -->
+  <script src="index.js"></script>
+  <script>
+  (async function(){
+    // Cek session -> apakah admin?
+    const me = await (await fetch('/api/me')).json().catch(()=>({}));
+    const isAdmin = !!(me && me.user && me.user.role === 'admin');
+
+    const loginCard = document.getElementById('adminLoginCard');
+    const dashWrap  = document.getElementById('adminDashWrap');
+    const soundBar  = document.getElementById('soundBar');
+
+    function setAdminUI(on){
+      loginCard.classList.toggle('hidden', on);
+      dashWrap.classList.toggle('hidden', !on);
+      soundBar.style.display = on ? '' : 'none';
+      // enable tombol kamera hanya jika admin (index.js akan baca state tombol)
+      ['btnStartCam','btnStartStream','btnStopStream','btnStartRec','btnStopRec'].forEach(id=>{
+        const el = document.getElementById(id); if (el) el.disabled = !on;
+      });
+    }
+    setAdminUI(isAdmin);
+
+    // Login admin
+    document.getElementById('btnAdminLogin')?.addEventListener('click', async ()=>{
+      const username = document.getElementById('adminUser').value.trim();
+      const password = document.getElementById('adminPass').value;
+      const r = await fetch('/api/admin/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({username,password})
+      });
+      if (r.ok) location.reload();
+      else document.getElementById('adminHint').textContent = 'Login gagal';
+    });
+
+    if (!isAdmin) return;
+
+
+    // Admin menu
+const adminMenu = document.getElementById('adminMenu');
+const modalPass = document.getElementById('modalPass');
+
+// --- Dropdown show/hide (supports mobile) ---
+const adminDropdown = document.getElementById('adminDropdown');
+
+// Toggle on click (mobile/touch)
+adminMenu.addEventListener('click', (e) => {
+  // Ignore clicks on buttons inside the dropdown; they have their own handlers
+  if (e.target.id === 'btnChangePass' || e.target.id === 'btnLogout') return;
+  adminDropdown.classList.toggle('hidden');
+});
+document.getElementById('btnLogout')?.addEventListener('click', async ()=>{
+  const r = await fetch('/api/admin/logout', { method:'POST' });
+  if (r.ok) location.reload(); else toast('Logout gagal');
+});
+
+
+// Close when clicking outside
+document.addEventListener('click', (e) => {
+  if (!adminMenu.contains(e.target)) {
+    adminDropdown.classList.add('hidden');
+  }
+});
+
+document.getElementById('btnChangePass')?.addEventListener('click', ()=>{
+  modalPass.classList.remove('hidden');
+});
+
+document.getElementById('btnPassClose')?.addEventListener('click', ()=>{
+  modalPass.classList.add('hidden');
+  document.getElementById('oldPass').value='';
+  document.getElementById('newPass').value='';
+  document.getElementById('newPass2').value='';
+  document.getElementById('passHint').textContent='';
+});
+
+document.getElementById('btnPassSave')?.addEventListener('click', async ()=>{
+  const old_password = document.getElementById('oldPass').value;
+  const new_password = document.getElementById('newPass').value;
+  const new2 = document.getElementById('newPass2').value;
+  if (!old_password || !new_password) return toast('Lengkapi password');
+  if (new_password !== new2) return toast('Konfirmasi password tidak sama');
+  const r = await fetch('/api/admin/change-password', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ old_password, new_password })
+  });
+  if (r.ok){ toast('Password diganti'); modalPass.classList.add('hidden'); }
+  else {
+    const msg = await r.text().catch(()=> 'Gagal ganti password');
+    document.getElementById('passHint').textContent = msg || 'Gagal ganti password';
+  }
+});
+
+
+    // ====== Produk ======
+    async function adminReloadProducts(){
+      const res = await fetch('/api/products');
+      const list = await res.json();
+      const tbody = document.querySelector('#adminProdTable tbody');
+      tbody.innerHTML = '';
+      list.forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.id}</td>
+          <td><input value="${escapeAttr(p.name)}" data-id="${p.id}" class="aName"></td>
+          <td><input type="number" value="${p.price_idr}" data-id="${p.id}" class="aPrice"></td>
+          <td><textarea data-id="${p.id}" class="aDesc">${escapeHtml(p.description||'')}</textarea></td>
+          <td>${p.image_url ? `<img src="${p.image_url}" class="thumb">` : `<span class="tag">no image</span>`}</td>
+          <td>
+            <button class="pill aSave" data-id="${p.id}">Simpan</button>
+            <button class="pill aDel"  data-id="${p.id}">Hapus</button>
+            <div style="margin-top:6px;">
+              <input type="file" accept="image/*" class="aPhoto" data-id="${p.id}">
+              <button class="pill aUpload" data-id="${p.id}">Upload Foto</button>
+            </div>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll('.aSave').forEach(btn=>{
+        btn.onclick = async (e)=>{
+          const tr = closestRow(e.currentTarget);
+          const id = e.currentTarget.getAttribute('data-id');
+          const name  = tr.querySelector('.aName').value.trim();
+          const price = parseInt(tr.querySelector('.aPrice').value||'0',10);
+          const desc  = tr.querySelector('.aDesc').value;
+          const r = await fetch('/api/admin/products/'+id, {
+            method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({name, description:desc, price_idr:price, is_active:true})
+          });
+          if (!r.ok) alert('Gagal update produk');
+        };
+      });
+      tbody.querySelectorAll('.aDel').forEach(btn=>{
+        btn.onclick = async (e)=>{
+          const id = e.currentTarget.getAttribute('data-id');
+          if (!confirm('Hapus produk '+id+'?')) return;
+          const r = await fetch('/api/admin/products/'+id, {method:'DELETE'});
+          if (r.ok) await adminReloadProducts(); else alert('Gagal hapus');
+        };
+      });
+      tbody.querySelectorAll('.aUpload').forEach(btn=>{
+        btn.onclick = async (e)=>{
+          const id = e.currentTarget.getAttribute('data-id');
+          const tr = closestRow(e.currentTarget);
+          const inp = tr.querySelector('.aPhoto');
+          if (!inp.files || !inp.files[0]) { alert('Pilih file dulu'); return; }
+          const fd = new FormData(); fd.append('photo', inp.files[0]);
+          const r = await fetch('/api/admin/products/'+id+'/photo', { method:'POST', body: fd });
+          if (r.ok) await adminReloadProducts(); else alert('Gagal upload');
+        };
+      });
+    }
+    document.getElementById('btnCreateProd').addEventListener('click', async ()=>{
+      const name  = document.getElementById('aName').value.trim();
+      const price = parseInt(document.getElementById('aPrice').value||'0',10);
+      const desc  = document.getElementById('aDesc').value;
+      if (!name || !price) return alert('Nama & harga wajib diisi');
+      const r = await fetch('/api/admin/products', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name, description:desc, price_idr:price, is_active:true})
+      });
+      if (r.ok) {
+        document.getElementById('aName').value='';
+        document.getElementById('aPrice').value='';
+        document.getElementById('aDesc').value='';
+        await adminReloadProducts();
+      } else {
+        alert('Gagal tambah produk');
+      }
+    });
+    document.getElementById('btnReloadProd').addEventListener('click', adminReloadProducts);
+
+    // ====== Orders ======
+    async function adminReloadOrders(highlightId){
+      const r = await fetch('/api/admin/orders');
+      const tbody = document.querySelector('#adminOrderTable tbody');
+      if (!r.ok) { tbody.innerHTML = '<tr><td colspan="10" class="muted">Unauthorized</td></tr>'; return; }
+      const rows = await r.json();
+      tbody.innerHTML = '';
+
+      rows.forEach(o=>{
+        const tr = document.createElement('tr');
+        tr.dataset.id = String(o.id);
+
+        const subtotalFmt = `Rp ${Number(o.subtotal).toLocaleString('id-ID')}`;
+        const deliveryFmt = Number(o.delivery_fee);
+        const totalFmt    = Number(o.total);
+
+        // Items -> HTML list
+        const itemsHtml = Array.isArray(o.items) && o.items.length
+          ? `<ul class="itemsList">` + o.items.map(it => {
+              const priceFmt = Number(it.price_at_add).toLocaleString('id-ID');
+              const lineFmt  = Number(it.line_total).toLocaleString('id-ID');
+              return `<li>${escapeHtml(it.product_name||'')}
+                × ${it.qty} @ Rp ${priceFmt} = <b>Rp ${lineFmt}</b></li>`;
+            }).join('') + `</ul>`
+          : `<span class="muted">—</span>`;
+
+        // normalisasi nomor WA: buang non-digit, jika mulai 0 → ubah ke 62
+        function normWa(num){
+          let d = String(num||'').replace(/\D/g,'');
+          if (!d) return '';
+          if (d.startsWith('0')) d = '62' + d.slice(1);
+          return d;
+        }
+
+        // detail order untuk dikirim ke WA (dengan item list)
+        const itemsText = (Array.isArray(o.items) && o.items.length)
+          ? o.items.map(it => {
+              const p = Number(it.price_at_add).toLocaleString('id-ID');
+              const l = Number(it.line_total).toLocaleString('id-ID');
+              return `- ${it.product_name} x ${it.qty} @ Rp ${p} = Rp ${l}`;
+            }).join('\n')
+          : '- (kosong)';
+
+        const detailText =
+          `ORDER #${o.id}\n` +
+          `Nama: ${o.shipping_name}\n` +
+          `HP: ${o.shipping_phone||'-'}\n` +
+          `Alamat: ${o.shipping_address}\n` +
+          `Items:\n${itemsText}\n` +
+          `Subtotal: Rp ${Number(o.subtotal).toLocaleString('id-ID')}\n` +
+          `Ongkir: Rp ${Number(o.delivery_fee).toLocaleString('id-ID')}\n` +
+          `Total: Rp ${Number(o.total).toLocaleString('id-ID')}\n` +
+          `Status: ${o.status}\n` +
+          `Catatan: ${o.note||'-'}`;
+
+        const waNum  = normWa(o.shipping_phone);
+        const waUrl  = waNum ? `https://wa.me/${waNum}?text=${encodeURIComponent(detailText)}` : '';
+
+        tr.innerHTML = `
+          <td>${o.id}</td>
+          <td>
+            <div>
+              <b>${escapeHtml(o.shipping_name)}</b>
+              <div class="muted">${escapeHtml(o.shipping_phone||'')}</div>
+            </div>
+          </td>
+          <td class="muted" style="max-width:260px;">${escapeHtml(o.shipping_address)}</td>
+          <td style="min-width:220px">${itemsHtml}</td>
+          <td>${subtotalFmt}</td>
+          <td>
+            <input type="number" value="${deliveryFmt}" class="oDelivery" data-id="${o.id}" data-subtotal="${o.subtotal}" />
+          </td>
+          <td>
+            <input type="number" value="${totalFmt}" class="oTotal" data-id="${o.id}" />
+          </td>
+          <td>
+            <select class="oStatus" data-id="${o.id}">
+              ${['new','paid','shipped','done','cancelled'].map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </td>
+          <td>
+  <div style="display:flex; gap:6px; flex-wrap:wrap">
+    <button class="pill oSave" data-id="${o.id}">Simpan</button>
+    <button class="pill oExport" data-id="${o.id}">Export XLS</button>
+    <button class="pill oDelete" data-id="${o.id}" style="border-color:#e53935;color:#e53935">Hapus</button>
+  </div>
+</td>
+
+            ${waUrl ? `<a class="pill" href="${waUrl}" target="_blank" rel="noopener">WhatsApp</a>` : `<span class="tag">no WA</span>`}
+          </td>
+        `;
+
+        // setelah dimasukkan ke DOM, baru pasang handler untuk input di baris ini
+        tbody.appendChild(tr);
+
+        // auto update Total ketika ongkir diinput (HARUS di-scope ke baris 'tr' ini)
+        const delInput = tr.querySelector('.oDelivery');
+        if (delInput){
+          delInput.addEventListener('input', (e)=>{
+            const el = e.currentTarget;
+            const sub = Number(el.getAttribute('data-subtotal')||'0');
+            const ong = Number(el.value||'0');
+            const totalEl = tr.querySelector('.oTotal');
+            if (totalEl) totalEl.value = String(sub + ong);
+          });
+        }
+      });
+
+      // attach actions (simpan)
+      tbody.querySelectorAll('.oSave').forEach(btn=>{
+        btn.onclick = async (e)=>{
+          const tr = closestRow(e.currentTarget);
+          const id = e.currentTarget.getAttribute('data-id');
+          const delivery_fee = parseInt(tr.querySelector('.oDelivery').value||'0',10);
+          const total        = parseInt(tr.querySelector('.oTotal').value||'0',10);
+          const status       = tr.querySelector('.oStatus').value;
+          const r = await fetch('/api/admin/orders/'+id, {
+            method:'PATCH', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({delivery_fee, total, status})
+          });
+          if (!r.ok) alert('Gagal simpan order');
+        };
+      });
+
+      // attach actions (export xls)
+tbody.querySelectorAll('.oExport').forEach(btn=>{
+  btn.onclick = (e)=>{
+    const id = e.currentTarget.getAttribute('data-id');
+    // buka file export sebagai attachment
+    window.open('/api/orders/'+id+'/export', '_blank');
+  };
+});
+
+// attach actions (hapus + konfirmasi)
+tbody.querySelectorAll('.oDelete').forEach(btn=>{
+  btn.onclick = async (e)=>{
+    const id = e.currentTarget.getAttribute('data-id');
+    if (!confirm('Yakin ingin menghapus transaksi order #'+id+' ?')) return;
+    const r = await fetch('/api/orders/'+id, { method:'DELETE' });
+    if (r.ok){
+      alert('Order #'+id+' telah dihapus.');
+      await adminReloadOrders();
+    } else {
+      const msg = await r.text().catch(()=> 'Gagal hapus');
+      alert(msg || 'Gagal hapus');
+    }
+  };
+});
+
+
+      // highlight jika ada ID spesifik
+      if (highlightId){
+        const row = tbody.querySelector(`tr[data-id="${highlightId}"]`);
+        if (row){
+          row.classList.add('flash');
+          setTimeout(()=>row.classList.remove('flash'), 3600);
+        }
+      }
+    }
+    document.getElementById('btnReloadOrders').addEventListener('click', ()=>adminReloadOrders());
+
+    document.getElementById('btnExportAll').addEventListener('click', ()=>{
+  // buka export semua order (admin-only) di tab baru
+  window.open('/api/admin/orders/export', '_blank');
+});
+
+
+    // init
+    await adminReloadProducts();
+    await adminReloadOrders();
+
+    // ====== Audio utils (tanpa file)
+    let actx=null;
+    function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){} } }
+    function beep(freq=880, dur=120, type='sine', vol=0.2){
+      if(!actx) return;
+      const o=actx.createOscillator(), g=actx.createGain();
+      o.type=type; o.frequency.value=freq; g.gain.value=vol;
+      o.connect(g); g.connect(actx.destination);
+      o.start(); setTimeout(()=>o.stop(), dur);
+    }
+    function sndChat(){ beep(1200, 90, 'square', 0.18); }
+    function sndOrder(){
+      beep(520, 120, 'triangle', 0.22);
+      setTimeout(()=>beep(740, 120, 'triangle', 0.22), 140);
+      setTimeout(()=>beep(920, 180, 'triangle', 0.22), 320);
+    }
+    document.getElementById('btnEnableSound')?.addEventListener('click', async ()=>{
+      ensureAudio(); if(actx && actx.state==='suspended') await actx.resume();
+      sndChat(); setTimeout(sndOrder, 350);
+    });
+
+    // ====== Subscribe global events: order baru (+highlight)
+    (function subscribeEvents(){
+  const origin = location.origin.replace(/^http/,'ws');
+  const wsev = new WebSocket(`${origin}/ws/_events`);
+
+  wsev.addEventListener('message', async ev=>{
+    try {
+      const msg = JSON.parse(ev.data);
+
+      if (msg.t === 'order'){
+        sndOrder();
+        const oid = msg.order_id ? String(msg.order_id) : null;
+        await adminReloadOrders(oid);
+      } else if (msg.t === 'c'){
+        sndChat();
+      } else if (msg.t === 'viewer_total'){
+        const n = Number(msg.n||0);
+        const el = document.getElementById('viewerCount');
+        if (el) el.textContent = String(n);
+      } else if (msg.t === 'viewer_join'){
+        toast('👀 Viewer baru bergabung');
+      }
+    } catch(_) {}
+  });
+
+  wsev.addEventListener('close', ()=> setTimeout(subscribeEvents, 1500));
+})();
+
+    // helpers
+
+    function toast(msg, ms=2400){
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>{ t.remove(); }, ms);
+}
+
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+    function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+    function closestRow(el){ while(el && el.tagName!=='TR') el=el.parentElement; return el; }
+  })();
+  </script>
+</body>
+</html>

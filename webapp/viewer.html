@@ -1,0 +1,618 @@
+<!-- webapp/viewer.html -->
+<!-- webapp/viewer.html -->
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Viewer / Customer — Live Shop</title>
+  <style>
+    :root { --bd:#ddd; --muted:#666; }
+    body { font-family: system-ui, sans-serif; margin: 18px; background:#fafafa; }
+    .card { border:1px solid var(--bd); border-radius:12px; padding:12px; background:#fff; }
+    .grid { display:grid; gap:12px; }
+    .grid-2 { grid-template-columns:1fr; }
+    @media(min-width:1000px){ .grid-2 { grid-template-columns:2fr 1fr; } }
+    .field { display:flex; flex-direction:column; gap:6px; }
+    .field input, .field textarea { padding:8px; border:1px solid var(--bd); border-radius:8px; width:100%; }
+    .pill { padding:8px 12px; border:1px solid var(--bd); border-radius:999px; background:#fff; cursor:pointer; }
+    .muted { color:var(--muted); }
+
+    /* Produk */
+    .prod { display:grid; grid-template-columns:96px 1fr auto; gap:12px; align-items:center; border:1px solid var(--bd); border-radius:10px; padding:8px; }
+    .thumb { width:96px; height:96px; object-fit:cover; border-radius:8px; background:#eee; cursor:zoom-in; }
+    .qty { width:64px; padding:8px; border:1px solid var(--bd); border-radius:8px; text-align:center; }
+    @media(max-width:600px){
+      .prod { grid-template-columns:72px 1fr auto; }
+      .pill { padding:10px 12px; }
+      .qty { width:56px; }
+    }
+
+    /* Live & Chat */
+    .live-wrap { display:grid; grid-template-columns: 1fr 320px; gap: 12px; }
+    @media(max-width: 900px){ .live-wrap { grid-template-columns: 1fr; } }
+    #frame { width: 100%; max-width: 960px; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.15); background:#111; }
+    .chat { border:1px solid #ddd; border-radius:12px; display:flex; flex-direction:column; max-height:60vh; }
+    #log { flex:1; padding:10px; overflow:auto; font-size:14px; }
+    #chatForm { display:flex; gap:6px; padding:8px; border-top:1px solid #eee; }
+    #chatForm input { flex:1; padding:8px; border-radius:999px; border:1px solid #ddd }
+    #chatForm button { padding:8px 12px; border-radius:999px; border:1px solid #ddd; background:#fff; cursor:pointer }
+    .me { color:#2c7; }
+    .sys { color:#888; font-style:italic }
+
+    /* Order box */
+    #orderBox .tbl { width:100%; border-collapse:collapse; font-size:14px; }
+    #orderBox .tbl th, #orderBox .tbl td { border-top:1px solid var(--bd); padding:6px; text-align:left; }
+    #orderBox .small { color:#555; font-size:13px; }
+    #orderBox .muted { font-size:13px; }
+    #orderBox .sum { text-align:right; }
+
+    /* Modal Image Viewer */
+    .img-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 9999;
+      cursor: zoom-out;
+      touch-action: none; /* biar drag tidak scroll body */
+    }
+    .img-modal.show { display:flex; }
+    .img-modal .inner {
+      position: relative; max-width: 92vw; max-height: 92vh; overflow: hidden; border-radius: 12px; background: #000;
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+    .img-modal img {
+      display:block; max-width: 100%; max-height: 92vh; margin: 0 auto; user-select:none; -webkit-user-drag:none;
+      transform-origin: center center; cursor: grab;
+    }
+    .img-modal img.grabbing { cursor: grabbing; }
+    .img-modal .close {
+      position: absolute; top: 8px; right: 10px;
+      background: rgba(255,255,255,.9); border: none; border-radius: 999px;
+      font-size: 20px; width: 36px; height: 36px; line-height: 36px; text-align:center; cursor:pointer;
+    }
+    .img-modal .hint {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      color: #fff; font-size: 12px; background: rgba(0,0,0,.35); padding: 4px 10px; border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome Viewer</h1>
+  <div class="grid grid-2">
+    <!-- Kiri: Live, Produk & Cart -->
+    <div class="card">
+      <h3>Akun & Live</h3>
+      <div class="muted" id="meInfo">Mempersiapkan sesi…</div>
+
+      <div style="display:flex; gap:8px; margin:8px 0; flex-wrap:wrap;">
+        <input id="roomInput" placeholder="Nama room (mis. main)" style="flex:1; min-width:200px; padding:8px; border:1px solid #ddd; border-radius:10px;">
+        <button id="btnStartInlineLive" class="pill">Tonton di Halaman Ini</button>
+        <button id="btnOpenLiveTab" class="pill">Buka Tab Live</button>
+        <span class="muted" id="liveHint"></span>
+      </div>
+
+      <!-- Live + Chat inline -->
+      <div class="live-wrap" id="inlineLive" style="display:none">
+        <div>
+          <h4 id="roomTitle" style="margin:4px 0 8px">Room:</h4>
+          <img id="frame" alt="stream akan muncul di sini">
+          <div style="margin-top:8px; color:#666">Bagikan tautan ini: <b id="shareLink"></b></div>
+        </div>
+        <div class="chat">
+          <div id="log"></div>
+          <form id="chatForm">
+            <input id="chatName" placeholder="Nama" required>
+            <input id="chatMsg" placeholder="Tulis pesan..." required>
+            <button>Kirim</button>
+          </form>
+        </div>
+      </div>
+
+      <h3 style="margin-top:16px;">Katalog Produk</h3>
+      <div id="prodList" class="grid" style="grid-template-columns:1fr; gap:10px;"></div>
+
+      <h3 style="margin-top:12px;">Keranjang</h3>
+      <div id="cartBox"></div>
+
+      <!-- Order Saya -->
+      <h3 style="margin-top:16px;">Order Saya</h3>
+      <div id="orderBox" class="muted">Belum ada order.</div>
+    </div>
+
+    <!-- Kanan: Profil & Checkout -->
+    <div class="card">
+      <h3>Profil</h3>
+      <div class="field"><label>Nama</label><input id="profileName" placeholder="Nama kamu" /></div>
+      <div class="field"><label>Email</label><input id="profileEmail" placeholder="Email aktif" /></div>
+      <div class="field"><label>No. HP / WhatsApp</label><input id="profilePhone" placeholder="08xxxxxxxxxx" /></div>
+      <div style="margin:8px 0;"><button id="btnSaveProfile" class="pill">Simpan Profil</button></div>
+
+      <h3>Checkout</h3>
+      <div class="field"><label>Nama Penerima</label><input id="shipName" /></div>
+      <div class="field"><label>No. WhatsApp</label><input id="shipPhone" /></div>
+      <div class="field"><label>Alamat</label><textarea id="shipAddr"></textarea></div>
+
+      <!-- ⚠️ Viewer tidak bisa atur ongkir -->
+      <div class="muted small" style="margin:6px 0 10px">
+        Ongkir ditentukan admin. Total final akan muncul di “Order Saya”.
+      </div>
+
+      <button id="btnCheckout" class="pill">Buat Order</button>
+    </div>
+  </div>
+
+  <!-- Modal Image Viewer -->
+  <div id="imgModal" class="img-modal" aria-hidden="true">
+    <div class="inner">
+      <button class="close" title="Tutup (Esc)" aria-label="Tutup">&times;</button>
+      <img id="modalImg" alt="Preview">
+      <div class="hint">Klik ganda / scroll untuk zoom, tarik untuk geser</div>
+    </div>
+  </div>
+
+  <script>
+  // ===== Helpers: Cookies, Audio, Escape =====
+  function setCookie(k,v,days=180){
+    document.cookie = k+'='+encodeURIComponent(v)+'; max-age='+(days*86400)+'; path=/; SameSite=Lax';
+  }
+  function getCookie(k){
+    const hit = document.cookie.split('; ').find(s=>s.startsWith(k+'='));
+    return hit ? decodeURIComponent(hit.split('=')[1]) : '';
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  // Audio: bunyi sukses order
+  let actx=null;
+  function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){} } }
+  function beep(freq=880, dur=120, type='sine', vol=0.2){
+    if(!actx) return;
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type=type; o.frequency.value=freq; g.gain.value=vol;
+    o.connect(g); g.connect(actx.destination);
+    o.start(); setTimeout(()=>o.stop(), dur);
+  }
+  function sndOrder(){
+    beep(700,120,'triangle',0.2);
+    setTimeout(()=>beep(950,160,'triangle',0.2),160);
+  }
+  document.addEventListener('click', ()=>{ ensureAudio(); if(actx && actx.state==='suspended') actx.resume(); }, {once:true});
+
+  // ===== Prefill dari Cookie + autosave
+  function prefillFromCookies(){
+    const pn = document.getElementById('profileName');
+    const pe = document.getElementById('profileEmail');
+    const pp = document.getElementById('profilePhone');
+    pn.value = getCookie('v_profile_name')  || pn.value || '';
+    pe.value = getCookie('v_profile_email') || pe.value || '';
+    pp.value = getCookie('v_profile_phone') || pp.value || '';
+    const sn = document.getElementById('shipName');
+    const sp = document.getElementById('shipPhone');
+    const sa = document.getElementById('shipAddr');
+    sn.value = getCookie('v_ship_name')  || sn.value || '';
+    sp.value = getCookie('v_ship_phone') || sp.value || '';
+    sa.value = getCookie('v_ship_addr')  || sa.value || '';
+    const ri = document.getElementById('roomInput'); if (ri) ri.value = getCookie('v_room') || ri.value || 'main';
+  }
+  function attachCookieAutosave(){
+    [['profileName','v_profile_name'],['profileEmail','v_profile_email'],['profilePhone','v_profile_phone'],
+     ['shipName','v_ship_name'],['shipPhone','v_ship_phone'],['shipAddr','v_ship_addr'],
+     ['roomInput','v_room'],].forEach(([id,key])=>{
+      const el = document.getElementById(id);
+      el && el.addEventListener('input', e=> setCookie(key, e.target.value));
+    });
+  }
+
+  // ===== Live & Chat Inline =====
+  let ws = null;
+  function addLine(text, cls=''){
+    const log = document.getElementById('log');
+    const p = document.createElement('div'); p.textContent = text;
+    if (cls) p.className = cls; log.appendChild(p); log.scrollTop = log.scrollHeight;
+  }
+  function stopWS(){
+    if (ws && ws.readyState === WebSocket.OPEN) try { ws.close(); } catch(_){}
+    ws = null;
+  }
+  async function startInlineLive(){
+    await fetch('/api/ensure-viewer', { method:'POST', credentials:'include' }).catch(()=>{});
+    const room = (document.getElementById('roomInput').value.trim() || 'main').replace(/[^a-zA-Z0-9_-]/g,'');
+    setCookie('v_room', room);
+    document.getElementById('inlineLive').style.display = '';
+    document.getElementById('roomTitle').textContent = 'Room: ' + room;
+    document.getElementById('shareLink').textContent = location.origin + '/live/' + room;
+
+    stopWS();
+    const origin = location.origin.replace(/^http/,'ws');
+    ws = new WebSocket(`${origin}/ws/${room}`);
+    const frame = document.getElementById('frame');
+
+    ws.addEventListener('open', () => addLine('Terhubung ke streaming…', 'sys'));
+    ws.addEventListener('close', () => addLine('Koneksi terputus.', 'sys'));
+    ws.addEventListener('message', ev => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.t === 'f') frame.src = msg.d;
+        else if (msg.t === 'c') addLine((msg.user||'anon') + ': ' + msg.text);
+        else if (msg.t === 'sys') addLine(msg.text, 'sys');
+      } catch (_) {}
+    });
+
+    const form = document.getElementById('chatForm');
+    form.onsubmit = (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('chatName').value.trim() || 'viewer';
+      const text = document.getElementById('chatMsg').value.trim();
+      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ t:'c', room, user:name, text }));
+      addLine('(me) ' + name + ': ' + text, 'me');
+      document.getElementById('chatMsg').value = '';
+    };
+  }
+
+  // ===== Order UI =====
+  function renderOrder(o){
+    const box = document.getElementById('orderBox');
+    if (!o){ box.textContent = 'Belum ada order.'; return; }
+    const items = (o.items||[]).map(it => `
+      <tr><td>${escapeHtml(it.product_name)}</td><td>x ${it.qty}</td>
+          <td class="sum">Rp ${Number(it.price_at_add).toLocaleString('id-ID')}</td>
+          <td class="sum">Rp ${Number(it.line_total).toLocaleString('id-ID')}</td></tr>
+    `).join('');
+    box.innerHTML = `
+      <div><b>ORDER #${o.id}</b> <span class="muted">(${new Date(o.created_at).toLocaleString('id-ID')})</span></div>
+      <div class="small">Status: <b>${o.status}</b></div>
+      <div class="small">Penerima: ${escapeHtml(o.shipping_name)} · ${escapeHtml(o.shipping_phone||'')}</div>
+      <div class="small">Alamat: ${escapeHtml(o.shipping_address)}</div>
+      <table class="tbl" style="margin-top:6px">
+        <thead><tr><th>Item</th><th>Qty</th><th>Harga</th><th>Total</th></tr></thead>
+        <tbody>${items}</tbody>
+        <tfoot>
+          <tr><td colspan="3" class="sum">Subtotal</td><td class="sum">Rp ${Number(o.subtotal).toLocaleString('id-ID')}</td></tr>
+          <tr><td colspan="3" class="sum">Ongkir (by admin)</td><td class="sum">Rp ${Number(o.delivery_fee).toLocaleString('id-ID')}</td></tr>
+          <tr><td colspan="3" class="sum"><b>Grand Total</b></td><td class="sum"><b>Rp ${Number(o.total).toLocaleString('id-ID')}</b></td></tr>
+        </tfoot>
+      </table>
+    `;
+  }
+
+  async function fetchOrder(orderId){
+    const r = await fetch('/api/orders/'+orderId, { credentials:'include' });
+    if (!r.ok) return null;
+    return await r.json();
+  }
+
+  async function loadMyOrder(){
+    const lastId = getCookie('v_last_order_id');
+    if (!lastId) { renderOrder(null); return; }
+    const o = await fetchOrder(lastId);
+    if (o) renderOrder(o);
+  }
+
+  function subscribeOrderEvents(){
+    const lastId = getCookie('v_last_order_id');
+    if (!lastId) return;
+    const origin = location.origin.replace(/^http/,'ws');
+    const wsev = new WebSocket(`${origin}/ws/_events`);
+    wsev.addEventListener('message', async ev=>{
+      try{
+        const msg = JSON.parse(ev.data);
+        if ((msg.t === 'order' || msg.t === 'order_update') && String(msg.order_id) === String(lastId)){
+          const o = await fetchOrder(lastId);
+          if (o) renderOrder(o);
+        }
+      }catch(_){}
+    });
+    wsev.addEventListener('close', ()=> setTimeout(subscribeOrderEvents, 1500));
+  }
+
+  // ====== Produk: render + Add to cart (dengan qty) ======
+  async function loadProducts(){
+    const res = await fetch('/api/products', { credentials:'include' });
+    const list = await res.json();
+    const box = document.getElementById('prodList');
+    box.innerHTML = '';
+    list.forEach(p=>{
+      const wrap = document.createElement('div');
+      wrap.className = 'prod';
+      wrap.innerHTML = `
+        <img class="thumb" src="${p.image_url||''}" onerror="this.style.visibility='hidden';" alt="">
+        <div>
+          <div><b>${escapeHtml(p.name)}</b></div>
+          <div class="muted" style="font-size:13px">${p.description?escapeHtml(p.description):''}</div>
+          <div style="margin-top:4px"><b>Rp ${Number(p.price_idr).toLocaleString('id-ID')}</b></div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:end; gap:6px;">
+          <div style="display:flex; gap:6px; align-items:center;">
+            <label class="muted" for="q-${p.id}" style="font-size:12px;">Qty</label>
+            <input id="q-${p.id}" class="qty" type="number" min="1" step="1" value="1" inputmode="numeric">
+          </div>
+          <button class="pill addBtn" data-id="${p.id}">Tambah ke Keranjang</button>
+        </div>
+      `;
+      // add to cart dengan qty
+      wrap.querySelector('.addBtn').onclick = async (ev)=>{
+        const id = Number(ev.currentTarget.getAttribute('data-id'));
+        const qEl = wrap.querySelector(`#q-${p.id}`);
+        let qty = parseInt(qEl?.value || '1', 10);
+        if (!Number.isFinite(qty) || qty < 1) qty = 1;
+        if (qty > 9999) qty = 9999;
+        let resp = await fetch('/api/cart/items', {
+          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({ product_id:id, qty })
+        });
+        if (resp.status === 401 || resp.status === 403) {
+          await fetch('/api/ensure-viewer', { method:'POST', credentials:'include' }).catch(()=>{});
+          resp = await fetch('/api/cart/items', {
+            method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({ product_id:id, qty })
+          });
+        }
+        if (!resp.ok) {
+          const txt = await resp.text().catch(()=> '');
+          alert('Gagal menambah ke keranjang: ' + (txt || resp.status));
+          return;
+        }
+        await loadCart();
+      };
+      // enter pada qty = klik tambah
+      wrap.querySelector(`#q-${p.id}`)?.addEventListener('keydown', (e)=>{
+        if (e.key === 'Enter') wrap.querySelector('.addBtn').click();
+      });
+      box.appendChild(wrap);
+    });
+  }
+
+  // 5) Cart
+  async function loadCart(){
+    const res = await fetch('/api/cart', { credentials:'include' });
+    const box = document.getElementById('cartBox');
+    if (!res.ok) { box.innerHTML = '<div class="muted">Belum login</div>'; return; }
+    const c = await res.json();
+    box.innerHTML = '';
+    c.items.forEach(it=>{
+      const row = document.createElement('div');
+      row.style.cssText='display:flex;justify-content:space-between;gap:8px;margin:6px 0;';
+      row.innerHTML = `<span>${escapeHtml(it.name)} x ${it.qty}</span>
+        <span>Rp ${Number(it.line_total).toLocaleString('id-ID')}</span>
+        <span>
+          <button class="pill" data-id="${it.id}" data-qty="${it.qty-1}">-</button>
+          <button class="pill" data-id="${it.id}" data-qty="${it.qty+1}">+</button>
+          <button class="pill" data-id="${it.id}" data-del="1">Hapus</button>
+        </span>`;
+      const [btnMinus, btnPlus, btnDel] = row.querySelectorAll('button');
+      btnMinus.onclick = async (e)=>{
+        const id = e.currentTarget.getAttribute('data-id');
+        const qty = Number(e.currentTarget.getAttribute('data-qty'));
+        if (qty<=0) await fetch('/api/cart/items/'+id, { method:'DELETE', credentials:'include' });
+        else await fetch('/api/cart/items/'+id, {
+          method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({qty})
+        });
+        await loadCart();
+      };
+      btnPlus.onclick = async (e)=>{
+        const id = e.currentTarget.getAttribute('data-id');
+        const qty = Number(e.currentTarget.getAttribute('data-qty'));
+        await fetch('/api/cart/items/'+id, {
+          method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({qty})
+        });
+        await loadCart();
+      };
+      btnDel.onclick = async (e)=>{
+        const id = e.currentTarget.getAttribute('data-id');
+        await fetch('/api/cart/items/'+id, { method:'DELETE', credentials:'include' });
+        await loadCart();
+      };
+      box.appendChild(row);
+    });
+    const total = document.createElement('div');
+    total.style.cssText='text-align:right;margin-top:8px;';
+    total.innerHTML = `<b>Subtotal: Rp ${Number(c.subtotal).toLocaleString('id-ID')}</b>`;
+    box.appendChild(total);
+  }
+
+  // 6) Checkout (tanpa input ongkir dari viewer)
+  document.getElementById('btnCheckout').addEventListener('click', async ()=>{
+    const shipping_name = document.getElementById('shipName').value.trim();
+    const shipping_phone = document.getElementById('shipPhone').value.trim();
+    const shipping_address = document.getElementById('shipAddr').value.trim();
+    if(!shipping_name || !shipping_phone || !shipping_address) {
+      alert('Lengkapi data pengiriman'); return;
+    }
+    setCookie('v_ship_name',  shipping_name);
+    setCookie('v_ship_phone', shipping_phone);
+    setCookie('v_ship_addr',  shipping_address);
+
+    const r = await fetch('/api/orders', {
+      method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+      body: JSON.stringify({shipping_name, shipping_phone, shipping_address}) // tidak kirim delivery_fee
+    });
+    const j = await r.json().catch(()=>({}));
+    if (r.ok){
+      sndOrder();
+      setCookie('v_last_order_id', String(j.order_id));  // simpan order terakhir
+      alert('Order dibuat. ID: '+j.order_id+' (Total awal: Rp '+Number(j.total).toLocaleString('id-ID')+')');
+      await loadMyOrder();       // tampilkan detail order
+      subscribeOrderEvents();    // dengarkan update dari admin
+    } else {
+      alert('Gagal: '+JSON.stringify(j));
+    }
+    await loadCart();
+  });
+
+  // ==== Modal Image Viewer logic ====
+  (function(){
+    const modal = document.getElementById('imgModal');
+    const img   = document.getElementById('modalImg');
+    const btnX  = modal.querySelector('.close');
+
+    let scale = 1, minScale = 1, maxScale = 5;
+    let pos = {x:0,y:0}, origin = {x:0,y:0}, dragging = false;
+
+    function applyTransform(){
+      img.style.transform = `translate(${pos.x}px, ${pos.y}px) scale(${scale})`;
+    }
+    function openModal(src){
+      img.src = src || '';
+      scale = 1; pos = {x:0,y:0}; applyTransform();
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+      modal.setAttribute('aria-hidden','false');
+      img.classList.remove('grabbing');
+    }
+    function closeModal(){
+      modal.classList.remove('show');
+      document.body.style.overflow = '';
+      modal.setAttribute('aria-hidden','true');
+    }
+
+    // Delegasi: klik thumbnail produk
+    document.addEventListener('click', (e)=>{
+      const t = e.target;
+      if (t && t.classList && t.classList.contains('thumb') && t.src){
+        openModal(t.src);
+      }
+    });
+
+    // Tutup
+    btnX.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e)=>{ if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && modal.classList.contains('show')) closeModal(); });
+
+    // Zoom dengan double click
+    img.addEventListener('dblclick', (e)=>{
+      e.preventDefault();
+      scale = (scale === 1) ? 2 : 1;
+      pos = {x:0,y:0};
+      applyTransform();
+    });
+
+    // Zoom dengan scroll
+    modal.addEventListener('wheel', (e)=>{
+      if (!modal.classList.contains('show')) return;
+      e.preventDefault();
+      const dir = e.deltaY < 0 ? 1.1 : 0.9;
+      const newScale = Math.min(maxScale, Math.max(minScale, scale * dir));
+      if (newScale !== scale){
+        scale = newScale;
+        applyTransform();
+      }
+    }, {passive:false});
+
+    // Drag untuk geser saat zoom > 1
+    img.addEventListener('mousedown', (e)=>{
+      if (scale <= 1) return;
+      dragging = true;
+      img.classList.add('grabbing');
+      origin.x = e.clientX - pos.x;
+      origin.y = e.clientY - pos.y;
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e)=>{
+      if (!dragging) return;
+      pos.x = e.clientX - origin.x;
+      pos.y = e.clientY - origin.y;
+      applyTransform();
+    });
+    window.addEventListener('mouseup', ()=>{
+      dragging = false;
+      img.classList.remove('grabbing');
+    });
+
+    // Touch: drag sederhana (tanpa pinch untuk kesederhanaan)
+    let tDragging = false;
+    img.addEventListener('touchstart', (e)=>{
+      if (scale <= 1) return;
+      if (e.touches.length === 1){
+        tDragging = true;
+        const t = e.touches[0];
+        origin.x = t.clientX - pos.x;
+        origin.y = t.clientY - pos.y;
+      }
+    }, {passive:true});
+    img.addEventListener('touchmove', (e)=>{
+      if (!tDragging || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      pos.x = t.clientX - origin.x;
+      pos.y = t.clientY - origin.y;
+      applyTransform();
+    }, {passive:true});
+    img.addEventListener('touchend', ()=>{ tDragging = false; });
+  })();
+
+  (async function(){
+    // Prefill awal
+    prefillFromCookies();
+
+    // 1) Auto-register viewer
+    await fetch('/api/ensure-viewer', { method:'POST', credentials:'include' }).catch(()=>{});
+    const meInfo = document.getElementById('meInfo');
+
+    // Ambil session & isi profil bila kosong
+    try{
+      const me = await (await fetch('/api/me', { credentials:'include' })).json();
+      if (me && me.user){
+        meInfo.textContent = 'Session: ' + (me.user.name||'') + (me.user.email?(' · '+me.user.email):'');
+        const pn = document.getElementById('profileName');
+        const pe = document.getElementById('profileEmail');
+        const pp = document.getElementById('profilePhone');
+        if(!pn.value) pn.value = me.user.name || '';
+        if(!pe.value) pe.value = me.user.email || '';
+        if(!pp.value) pp.value = me.user.phone || '';
+        const sn = document.getElementById('shipName');
+        if(!sn.value && pn.value) sn.value = pn.value;
+      } else {
+        meInfo.textContent = 'Gagal membuat sesi viewer.';
+      }
+    }catch(_){
+      meInfo.textContent = 'Gagal membuat sesi viewer.';
+    }
+
+    // 2) Kontrol Live
+    document.getElementById('btnStartInlineLive').addEventListener('click', startInlineLive);
+    document.getElementById('btnOpenLiveTab').addEventListener('click', ()=>{
+      const room = (document.getElementById('roomInput').value.trim() || 'main').replace(/[^a-zA-Z0-9_-]/g,'');
+      window.open('/live/'+room, '_blank');
+    });
+
+    // 3) Simpan profil
+    document.getElementById('btnSaveProfile').addEventListener('click', async ()=>{
+      const name  = document.getElementById('profileName').value.trim();
+      const email = document.getElementById('profileEmail').value.trim();
+      const phone = document.getElementById('profilePhone').value.trim();
+      const r = await fetch('/api/user/profile', {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+        body: JSON.stringify({name,email,phone})
+      });
+      if (r.ok){
+        setCookie('v_profile_name', name);
+        setCookie('v_profile_email', email);
+        setCookie('v_profile_phone', phone);
+        meInfo.textContent = 'Profil disimpan.';
+      } else {
+        meInfo.textContent = 'Gagal simpan profil.';
+      }
+    });
+
+    // 4) Produk
+    await loadProducts();
+
+    // 5) Cart
+    await loadCart();
+
+    // 6) Order saya + subscribe update
+    await loadMyOrder();
+    subscribeOrderEvents();
+  })();
+
+  // tutup WS saat meninggalkan halaman
+  window.addEventListener('beforeunload', ()=>{ try{ if(ws) ws.close(); }catch(_){}});
+
+  </script>
+</body>
+</html>
