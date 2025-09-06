@@ -1,85 +1,152 @@
 # 📺 LiveStreamShop (Rust)
 
-**LiveStreamShop** adalah aplikasi live streaming shopping berbasis web yang bersifat open-source, dibangun dengan **Rust**.
-Menawarkan platform mandiri bagi penjual: live stream di situs Anda sendiri, interaksi real-time dengan pembeli melalui chat, serta integrasi keranjang belanja langsung dalam sesi—semua dalam satu alur yang mulus.
+**LiveStreamShop** adalah aplikasi **live streaming shopping** berbasis web yang bersifat **open-source**, dibangun dengan **Rust**.
+Aplikasi ini memungkinkan penjual melakukan **live streaming langsung dari website sendiri**, berinteraksi dengan pembeli via **chat real-time**, dan menyelesaikan transaksi lewat **keranjang belanja terintegrasi**.
 
 ---
 
-## Why LiveStreamShop?
+## 🚀 Mengapa LiveStreamShop?
 
-Sebelumnya, banyak penjual bergantung pada platform seperti TikTok atau Shopee untuk live commerce. LiveStreamShop hadir sebagai **alternatif mandiri**—penjual tetap pegang kendali penuh atas data, branding, dan interaksi dengan pembeli.
+Mayoritas penjual online harus bergantung pada platform besar seperti TikTok atau Shopee untuk live commerce.
+LiveStreamShop hadir sebagai **alternatif mandiri**:
 
----
-
-## Fitur Utama
-
-* 🎥 Live Streaming langsung dari website.
-* Chat real-time untuk interaksi langsung pembeli.
-* Keranjang & checkout terintegrasi selama live.
-* Kepemilikan data ditangani sepenuhnya oleh penjual.
-* Kode open-source—mudah dikustomisasi dan diberi branding.
-* Dibangun dengan Rust untuk performa cepat dan aman.
+* Kontrol penuh atas **data pembeli**.
+* Branding bisa dikustomisasi sesuai bisnis.
+* Tidak terikat aturan & komisi platform lain.
 
 ---
 
-## Demo Video
+## ✨ Fitur Utama
 
-Lihat demo penggunaan LiveStreamShop langsung di video berikut yang menunjukkan alur live streaming dengan chat, interaksi, hingga proses checkout:
-
-\[[LiveStreamShop Rust Demo]()]\([https://www.youtube.com/watch?v=oojtmtgQ1vI](https://www.youtube.com/watch?v=oojtmtgQ1vI))
-
-*(Catatan: jika video gagal memuat, coba akses langsung di YouTube dengan tautan `https://www.youtube.com/watch?v=oojtmtgQ1vI`.)*
+* 🎥 **Live Streaming** langsung dari situs Anda.
+* 💬 **Chat real-time** host ↔ pembeli.
+* 🛒 **Keranjang & checkout** langsung di sesi live.
+* 🔐 **Kepemilikan penuh data** (tidak dikunci vendor).
+* 🛠️ **Open-source**, bisa dikustomisasi.
+* ⚡ Dibangun dengan **Rust (Axum, Tokio, SQLx)** → performa cepat & aman.
 
 ---
 
-## Tech Stack
+## 📼 Demo Video
+
+[![Demo YouTube](https://img.youtube.com/vi/oojtmtgQ1vI/0.jpg)](https://www.youtube.com/watch?v=oojtmtgQ1vI)
+👉 Klik thumbnail atau buka langsung: [https://www.youtube.com/watch?v=oojtmtgQ1vI](https://www.youtube.com/watch?v=oojtmtgQ1vI)
+
+---
+
+## 🧩 Tech Stack
 
 * **Backend**: Rust (Axum, Tokio, SQLx)
 * **Frontend**: HTML, CSS, JavaScript
-* **Database**: MySQL / PostgreSQL (direncanakan)
-* **Video**: Saat ini menggunakan **HTML5 `<video>` + Media APIs** sederhana
-  (⚠️ **WebRTC** masih dalam tahap rencana implementasi untuk mendukung skala besar).
+* **Database**: MySQL (PostgreSQL planned)
+* **Streaming**:
+
+  * HTML5 Video + Canvas (render output + filter)
+  * **WebRTC (Client-side)** untuk peer-to-peer media
+* **Signaling**: WebSocket via Axum
 
 ---
 
-## Keterbatasan Versi Saat Ini
+## 🔌 Cara Kerja WebRTC
 
-* 🚧 **Jumlah viewer masih terbatas** (belum optimal untuk ribuan penonton sekaligus).
-* 🚧 **Belum ada dukungan WebRTC** → artinya kualitas streaming dan skalabilitas masih sederhana, cocok untuk demo atau penggunaan kecil-menengah.
-* 🚧 **Fitur lanjutan** seperti multi-host streaming, integrasi pembayaran otomatis, dan optimasi server distribusi konten (CDN) masih dalam roadmap.
+LiveStreamShop memanfaatkan **WebRTC** agar video & audio host bisa langsung dikirim ke viewer tanpa server media khusus.
+
+### 1. Media (Browser)
+
+* Host mengambil video dari `<canvas>` + audio dari `getUserMedia()`.
+* API `RTCPeerConnection` di browser membuat **SDP offer/answer** dan melakukan ICE gathering.
+
+### 2. STUN/TURN
+
+* Default: **STUN publik** `stun:stun.l.google.com:19302`.
+* Untuk NAT ketat → jalankan **coturn** sebagai TURN server terpisah, lalu tambahkan di config ICE.
+
+```js
+const ICE = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'turns:turn.yourdomain.com:5349', username: 'user', credential: 'pass' }
+];
+```
+
+### 3. Signaling (Server Rust)
+
+* Server Axum hanya sebagai **relay pesan JSON** lewat WebSocket `/ws/:room`.
+* Pesan yang di-relay:
+
+  ```jsonc
+  { "t": "offer", "sdp": "..." }
+  { "t": "answer", "sdp": "..." }
+  { "t": "ice", "candidate": { ... } }
+  { "t": "sys", "text": "viewer_enter" }
+  ```
+
+### 4. DataChannel (Chat)
+
+* Host membuka DataChannel `chat` → viewer otomatis menerima.
+* Chat juga punya fallback via WS `/ws/_events`.
+
+### 5. Autoplay & Audio
+
+* Viewer default **muted** karena aturan browser.
+* Harus ada tombol **Unmute** agar audio aktif.
 
 ---
 
-## Mulai Cepat
+## 🔄 Sequence Diagram WebRTC
 
-### 1. Clone Repository
+```mermaid
+sequenceDiagram
+    participant H as Host (Browser)
+    participant S as Server (Axum /ws/:room)
+    participant V as Viewer (Browser)
+
+    H->>H: getUserMedia() / captureStream()
+    H->>H: createOffer (SDP)
+    H->>S: send { t:"offer", sdp:... }
+    S-->>V: relay { t:"offer", sdp:... }
+
+    V->>V: setRemoteDescription(offer)
+    V->>V: createAnswer (SDP)
+    V->>S: send { t:"answer", sdp:... }
+    S-->>H: relay { t:"answer", sdp:... }
+
+    H->>S: send { t:"ice", candidate:... }
+    S-->>V: relay { t:"ice", candidate:... }
+
+    V->>S: send { t:"ice", candidate:... }
+    S-->>H: relay { t:"ice", candidate:... }
+
+    H-->>V: Media stream (video+audio) via P2P
+    V-->>H: DataChannel (chat)
+```
+
+---
+
+## 📉 Keterbatasan Versi Saat Ini
+
+* P2P cocok untuk **viewer terbatas** (10–20).
+* Untuk ribuan viewer → butuh **SFU/MCU** (mis. mediasoup, Janus, ion-sfu).
+* Fitur seperti multi-host, pembayaran otomatis, CDN belum tersedia.
+
+---
+
+## 🛠️ Setup Cepat
+
+### 1. Clone
 
 ```bash
 git clone https://github.com/kukuhtw/livestreamshop_rust.git
 cd livestreamshop_rust
 ```
 
-### 2. Setup Environment
-
-Tambahkan file `.env` dengan konfigurasi seperti:
+### 2. Buat `.env`
 
 ```env
-# Port aplikasi (default 3030 jika tidak diisi)
 PORT=3030
-
-# Database MySQL
 DATABASE_URL=mysql://root:password@127.0.0.1:3306/livestream_shop?ssl-mode=DISABLED
-
-# Session cookie
 SESSION_COOKIE_NAME=sid
-
-# Upload directory (lokasi file disimpan di server)
 UPLOAD_DIR=../webapp/uploads
-
-# URL publik untuk akses file upload
 PUBLIC_BASE_URL=/static/uploads
-
-# Nama aplikasi
 APP_NAME="Live Stream Shop"
 ```
 
@@ -89,75 +156,51 @@ APP_NAME="Live Stream Shop"
 cargo run
 ```
 
-Akses server di: [http://127.0.0.1:3030](http://127.0.0.1:3030)
+Akses di: [http://127.0.0.1:3030](http://127.0.0.1:3030)
 
-### 4. Buat Admin Pertama
+### 4. Setup Admin
 
-Buka halaman berikut untuk membuat akun admin pertama:
-[http://127.0.0.1:3030/static/setupadmin.html](http://127.0.0.1:3030/static/setupadmin.html)
+Buka: [http://127.0.0.1:3030/static/setupadmin.html](http://127.0.0.1:3030/static/setupadmin.html)
 
 ---
 
-## Struktur Proyek
+## 📂 Struktur Proyek
 
 ```
 livestreamshop_rust/
-├── assets/
-│   └── haarcascade_frontalface_default.xml  # XML deteksi wajah untuk fitur video di masa depan
-│
 ├── server/
 │   ├── src/
-│   │   ├── handlers/
-│   │   │   ├── admin.rs        # Rute & logika admin
-│   │   │   ├── cart.rs         # Logika keranjang belanja
-│   │   │   ├── mod.rs          # Modul routing
-│   │   │   ├── orders.rs       # Manajemen pesanan
-│   │   │   ├── products.rs     # Produk & katalog
-│   │   │   └── users.rs        # Autentikasi & profil pengguna
-│   │   └── main.rs             # Entrypoint server
-│   ├── .env                   # Konfigurasi environment
-│   ├── Cargo.toml             # Metadata & dependensi Rust
-│   └── Cargo.lock             # Lockfile otomatis
-│
-├── uploads/                    # Folder penyimpanan file upload (gambar/video)
-│
+│   │   ├── handlers/   # routes admin, products, orders, users
+│   │   └── main.rs
+│   ├── Cargo.toml
+│   └── .env
 ├── webapp/
-│   └── uploads/
-│       ├── admin.html          # UI dashboard admin
-│       ├── index.html          # Halaman utama
-│       ├── index.js            # Logika frontend
-│       ├── livepage.html       # Halaman live streaming
-│       ├── setupadmin.html     # Halaman setup admin pertama
-│       └── viewer.html         # Halaman viewer/pembeli
-│
-├── LICENSE                     # Lisensi (MIT, dsb.)
-├── mysignaturee.txt            # Informasi penanda tangan penulis
-└── README.md                   # Dokumentasi proyek
+│   ├── admin.html      # Dashboard admin
+│   ├── index.html      # Halaman utama
+│   ├── livepage.html   # Halaman viewer live
+│   └── webrtc.js       # Logika WebRTC host
+└── uploads/            # Penyimpanan file
 ```
 
 ---
 
-## Kontribusi
+## 🤝 Kontribusi
 
-Kontribusi sangat disambut!
-
-* Fork repositori ini
-* Buat branch fitur
-* Submit pull request
+* Fork repo → buat branch → PR.
+* Diskusi fitur di GitHub Issues.
 
 ---
 
-## Kontak
+## 📬 Kontak
 
-* **Author**: Kukuh Tripamungkas Wicaksono (Kukuh TW)
+* **Author**: Kukuh Tripamungkas Wicaksono
 * **Email**: [kukuhtw@gmail.com](mailto:kukuhtw@gmail.com)
-* **WhatsApp**: [Chat sekarang](https://wa.me/628129893706)
-* **LinkedIn**: [Profil](https://id.linkedin.com/in/kukuhtw)
+* **WhatsApp**: [wa.me/628129893706](https://wa.me/628129893706)
+* **LinkedIn**: [linkedin.com/in/kukuhtw](https://id.linkedin.com/in/kukuhtw)
 
 ---
 
-## Lisensi
+## 📜 Lisensi
 
-Proyek ini dilisensikan di bawah **Apache 2.0 License**—bebas digunakan, modifikasi, dan disebarkan.
+Apache 2.0 License – bebas digunakan, dimodifikasi, dan disebarkan.
 
----
