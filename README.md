@@ -1,3 +1,4 @@
+
 # 📺 LiveStreamShop (Rust)
 
 **LiveStreamShop** adalah aplikasi **live streaming shopping** berbasis web yang bersifat **open-source**, dibangun dengan **Rust**.
@@ -10,20 +11,20 @@ Aplikasi ini memungkinkan penjual melakukan **live streaming langsung dari websi
 Mayoritas penjual online harus bergantung pada platform besar seperti TikTok atau Shopee untuk live commerce.
 LiveStreamShop hadir sebagai **alternatif mandiri**:
 
-* Kontrol penuh atas **data pembeli**.
-* Branding bisa dikustomisasi sesuai bisnis.
-* Tidak terikat aturan & komisi platform lain.
+* Kontrol penuh atas **data pembeli**
+* Branding bisa dikustomisasi sesuai bisnis
+* Tidak terikat aturan & komisi platform lain
 
 ---
 
 ## ✨ Fitur Utama
 
-* 🎥 **Live Streaming** langsung dari situs Anda.
-* 💬 **Chat real-time** host ↔ pembeli.
-* 🛒 **Keranjang & checkout** langsung di sesi live.
-* 🔐 **Kepemilikan penuh data** (tidak dikunci vendor).
-* 🛠️ **Open-source**, bisa dikustomisasi.
-* ⚡ Dibangun dengan **Rust (Axum, Tokio, SQLx)** → performa cepat & aman.
+* 🎥 **Live Streaming** langsung dari situs Anda
+* 💬 **Chat real-time** host ↔ pembeli
+* 🛒 **Keranjang & checkout** langsung di sesi live
+* 🔐 **Kepemilikan penuh data** (tidak dikunci vendor)
+* 🛠️ **Open-source**, bisa dikustomisasi
+* ⚡ Dibangun dengan **Rust (Axum, Tokio, SQLx)** → performa cepat & aman
 
 ---
 
@@ -39,10 +40,7 @@ LiveStreamShop hadir sebagai **alternatif mandiri**:
 * **Backend**: Rust (Axum, Tokio, SQLx)
 * **Frontend**: HTML, CSS, JavaScript
 * **Database**: MySQL (PostgreSQL planned)
-* **Streaming**:
-
-  * HTML5 Video + Canvas (render output + filter)
-  * **WebRTC (Client-side)** untuk peer-to-peer media
+* **Streaming**: HTML5 Video + Canvas (output filter) + **WebRTC** (P2P)
 * **Signaling**: WebSocket via Axum
 
 ---
@@ -53,25 +51,18 @@ LiveStreamShop memanfaatkan **WebRTC** agar video & audio host bisa langsung dik
 
 ### 1. Media (Browser)
 
-* Host mengambil video dari `<canvas>` + audio dari `getUserMedia()`.
-* API `RTCPeerConnection` di browser membuat **SDP offer/answer** dan melakukan ICE gathering.
+* Host ambil video dari `<canvas>` + audio dari `getUserMedia()`.
+* `RTCPeerConnection` membuat **SDP offer/answer** & ICE gathering.
 
 ### 2. STUN/TURN
 
 * Default: **STUN publik** `stun:stun.l.google.com:19302`.
-* Untuk NAT ketat → jalankan **coturn** sebagai TURN server terpisah, lalu tambahkan di config ICE.
-
-```js
-const ICE = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'turns:turn.yourdomain.com:5349', username: 'user', credential: 'pass' }
-];
-```
+* Untuk NAT ketat → jalankan **coturn** sebagai TURN server terpisah.
 
 ### 3. Signaling (Server Rust)
 
-* Server Axum hanya sebagai **relay pesan JSON** lewat WebSocket `/ws/:room`.
-* Pesan yang di-relay:
+* Server Axum hanya relay JSON lewat WebSocket `/ws/:room`.
+* Contoh pesan:
 
   ```jsonc
   { "t": "offer", "sdp": "..." }
@@ -82,13 +73,13 @@ const ICE = [
 
 ### 4. DataChannel (Chat)
 
-* Host membuka DataChannel `chat` → viewer otomatis menerima.
-* Chat juga punya fallback via WS `/ws/_events`.
+* Host → Viewer pakai DataChannel `chat`.
+* Fallback: WS `/ws/_events`.
 
 ### 5. Autoplay & Audio
 
 * Viewer default **muted** karena aturan browser.
-* Harus ada tombol **Unmute** agar audio aktif.
+* Harus ada tombol **Unmute** supaya audio jalan.
 
 ---
 
@@ -122,11 +113,73 @@ sequenceDiagram
 
 ---
 
+## 🏗️ Arsitektur Komponen
+
+```mermaid
+flowchart TD
+    subgraph CLIENT["🌐 Frontend (Browser)"]
+      H["Host<br/><small>admin.html + webrtc.js</small>"]
+      V["Viewer<br/><small>livepage.html</small>"]
+    end
+
+    subgraph SERVER["🦀 Backend (Rust / Axum)"]
+      AX["Axum Router<br/><small>HTTP + WebSocket</small>"]
+      SF["Static Files<br/><small>tower-http serve /static</small>"]
+      API["REST Endpoints<br/><small>/api/* (products, orders, users)</small>"]
+      WS["Signaling WS<br/><small>/ws/:room</small>"]
+      EVT["Global Events WS<br/><small>/ws/_events</small>"]
+    end
+
+    subgraph DATA["💾 Data & Storage"]
+      DB["MySQL<br/><small>SQLx</small>"]
+      UP["Uploads<br/><small>PUBLIC_BASE_URL</small>"]
+    end
+
+    STUN["STUN Server<br/><small>stun:stun.l.google.com:19302</small>"]
+    TURN["TURN Server (opsional)<br/><small>coturn</small>"]
+    CDN["CDN (opsional)<br/><small>cache static/uploads</small>"]
+
+    %% Static & Pages
+    H <-- HTTP GET --> SF
+    V <-- HTTP GET --> SF
+    SF --- AX
+
+    %% REST API
+    H <-- HTTP/JSON --> API
+    V <-- HTTP/JSON --> API
+    API --- DB
+    API --- UP
+
+    %% Signaling
+    H <-- WS JSON --> WS
+    V <-- WS JSON --> WS
+    WS --- AX
+
+    %% Event bus
+    H <-- WS JSON --> EVT
+    EVT --- AX
+
+    %% WebRTC Plane
+    H <-- P2P Media (SRTP) --> V
+
+    %% ICE infra
+    H -. ICE .-> STUN
+    V -. ICE .-> STUN
+    H -. relay .-> TURN
+    V -. relay .-> TURN
+
+    %% Optional CDN
+    SF -. cache .-> CDN
+    UP -. cache .-> CDN
+```
+
+---
+
 ## 📉 Keterbatasan Versi Saat Ini
 
 * P2P cocok untuk **viewer terbatas** (10–20).
-* Untuk ribuan viewer → butuh **SFU/MCU** (mis. mediasoup, Janus, ion-sfu).
-* Fitur seperti multi-host, pembayaran otomatis, CDN belum tersedia.
+* Ribuan viewer → butuh **SFU/MCU** (mis. mediasoup, Janus, ion-sfu).
+* Fitur multi-host, pembayaran otomatis, CDN masih dalam roadmap.
 
 ---
 
@@ -156,11 +209,11 @@ APP_NAME="Live Stream Shop"
 cargo run
 ```
 
-Akses di: [http://127.0.0.1:3030](http://127.0.0.1:3030)
+Buka: [http://127.0.0.1:3030](http://127.0.0.1:3030)
 
 ### 4. Setup Admin
 
-Buka: [http://127.0.0.1:3030/static/setupadmin.html](http://127.0.0.1:3030/static/setupadmin.html)
+Akses: [http://127.0.0.1:3030/static/setupadmin.html](http://127.0.0.1:3030/static/setupadmin.html)
 
 ---
 
@@ -186,8 +239,8 @@ livestreamshop_rust/
 
 ## 🤝 Kontribusi
 
-* Fork repo → buat branch → PR.
-* Diskusi fitur di GitHub Issues.
+* Fork repo → buat branch → PR
+* Diskusi fitur di GitHub Issues
 
 ---
 
