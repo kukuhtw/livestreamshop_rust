@@ -1,5 +1,14 @@
 // server/src/handlers/users.rs
-// server/src/handlers/users.rs
+/*
+=============================================================================
+Project : LiveStreamShop Rust — sell via live stream, chat & checkout on your site. 
+Author  : Kukuh Tripamungkas Wicaksono (Kukuh TW)
+Email   : kukuhtw@gmail.com
+WhatsApp: https://wa.me/628129893706
+LinkedIn: https://id.linkedin.com/in/kukuhtw
+=============================================================================
+*/
+
 
 use axum::{
     extract::State,

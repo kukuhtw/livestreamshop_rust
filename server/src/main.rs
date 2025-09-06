@@ -1,10 +1,14 @@
 // server/src/main.rs
 /*
-buatkan command untuk export data 
-pada database ini ke file data.mysql
-
- lsof -i :3030
+=============================================================================
+Project : LiveStreamShop Rust — sell via live stream, chat & checkout on your site. 
+Author  : Kukuh Tripamungkas Wicaksono (Kukuh TW)
+Email   : kukuhtw@gmail.com
+WhatsApp: https://wa.me/628129893706
+LinkedIn: https://id.linkedin.com/in/kukuhtw
+=============================================================================
 */
+
 
 mod handlers; // server/src/handlers/
 use handlers::{
