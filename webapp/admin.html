@@ -212,6 +212,8 @@
 
   <!-- Script kamera/streaming -->
   <script src="index.js"></script>
+  <script src="webrtc.js" defer></script>
+
   <script>
   (async function(){
     // Cek session -> apakah admin?
@@ -602,6 +604,112 @@ tbody.querySelectorAll('.oDelete').forEach(btn=>{
   wsev.addEventListener('close', ()=> setTimeout(subscribeEvents, 1500));
 })();
 
+    // ========= Tambahan: WebRTC HOST (tanpa menghapus kode lain) =========
+    const ROOM_NAME = 'main'; // ganti kalau mau dinamis
+    const ICE = [{urls:'stun:stun.l.google.com:19302'}];
+
+    let pc=null, dc=null, wsSig=null, streamOut=null;
+
+    // Share link ditampilkan saat streaming ON
+    
+    async function startWebRTC_AsHost(){
+      // Ambil stream dari CANVAS (hasil filter). Jika belum ada frame, fallback ke video element bila diperlukan.
+      const canvas = document.getElementById('canvas');
+      const video  = document.getElementById('video');
+
+      if (!canvas.captureStream){
+        toast('Browser tidak mendukung captureStream dari canvas'); 
+        return;
+      }
+
+      // 30fps dari canvas
+      streamOut = canvas.captureStream(30);
+
+      // (opsional) jika ingin ikutkan mic host:
+      // const mic = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(()=>null);
+      // if (mic) mic.getAudioTracks().forEach(t=> streamOut.addTrack(t));
+
+      pc = new RTCPeerConnection({ iceServers: ICE });
+      streamOut.getTracks().forEach(t => pc.addTrack(t, streamOut));
+
+      // Buat DataChannel untuk chat (host -> viewer)
+      dc = pc.createDataChannel('chat');
+      dc.onopen = ()=> console.log('DC open');
+      dc.onmessage = (e)=>{
+        const log = document.getElementById('hostLog');
+        const div = document.createElement('div');
+        div.textContent = '(viewer) ' + e.data;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+      };
+
+      // Signaling WS (pakai channel room yang sama)
+      const origin = location.origin.replace(/^http/,'ws');
+      wsSig = new WebSocket(`${origin}/ws/${ROOM_NAME}`);
+
+      wsSig.onmessage = async (ev)=>{
+        try{
+          const msg = JSON.parse(ev.data);
+          if (msg.t==='answer' && msg.sdp){
+            await pc.setRemoteDescription(new RTCSessionDescription({type:'answer', sdp: msg.sdp}));
+          } else if (msg.t==='ice' && msg.candidate){
+            try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(_){}
+          }
+        }catch(e){}
+      };
+
+      pc.onicecandidate = (ev)=>{
+        if (ev.candidate){
+          wsSig?.send(JSON.stringify({ t:'ice', candidate: ev.candidate }));
+        }
+      };
+
+      const offer = await pc.createOffer({ offerToReceiveAudio:false, offerToReceiveVideo:false });
+      await pc.setLocalDescription(offer);
+
+      wsSig.onopen = ()=>{
+        // broadcast offer (PoC: 1 host → 1 viewer)
+        wsSig.send(JSON.stringify({ t:'offer', sdp: offer.sdp }));
+      };
+
+      updateShareLink(true);
+      toast('WebRTC streaming dimulai');
+    }
+
+    
+
+    // Hubungkan tombol Start/Stop Streaming (tanpa mengubah event lain)
+    document.getElementById('btnStartStream')?.addEventListener('click', startWebRTC_AsHost);
+    document.getElementById('btnStopStream')?.addEventListener('click', stopWebRTC_AsHost);
+
+    // Kirim chat host → viewer via DataChannel (fallback tetap ada via WS lama)
+    document.getElementById('btnHostSend')?.addEventListener('click', ()=>{
+      const name = document.getElementById('hostName').value || 'host';
+      const text = document.getElementById('hostMsg').value.trim();
+      if (!text) return;
+      if (dc && dc.readyState==='open'){
+        dc.send(`${name}: ${text}`);
+        const log = document.getElementById('hostLog');
+        const div = document.createElement('div');
+        div.textContent = '(me) ' + name + ': ' + text;
+        div.className = 'me';
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+        document.getElementById('hostMsg').value='';
+      } else {
+        // fallback lama via WS global event (opsional): tetap pertahankan perilaku existing
+        const origin = location.origin.replace(/^http/,'ws');
+        const wsev = new WebSocket(`${origin}/ws/_events`);
+        wsev.onopen = ()=> {
+          wsev.send(JSON.stringify({ t:'c', room: ROOM_NAME, user: name, text }));
+          wsev.close();
+        };
+        document.getElementById('hostMsg').value='';
+      }
+    });
+
+    // ===============================================================
+
     // helpers
 
     function toast(msg, ms=2400){
@@ -614,5 +722,8 @@ tbody.querySelectorAll('.oDelete').forEach(btn=>{
     function closestRow(el){ while(el && el.tagName!=='TR') el=el.parentElement; return el; }
   })();
   </script>
+
+  
+
 </body>
 </html>

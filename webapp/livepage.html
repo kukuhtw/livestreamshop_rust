@@ -1,5 +1,4 @@
 <!--  webapp/livepage.html  -->
-<!-- webapp/livepage.html -->
 <!doctype html>
 <html lang="id">
 <head>
@@ -23,7 +22,8 @@
   <div class="main">
     <div>
       <h2 id="roomTitle">Room:</h2>
-      <img id="frame" alt="stream akan muncul di sini">
+      <!-- GANTI IMG -> VIDEO untuk MediaStream -->
+      <video id="frame" playsinline autoplay controls></video>
       <div style="margin-top:8px; color:#666">Bagikan tautan ini: <b id="link"></b></div>
     </div>
     <div class="chat">
@@ -37,6 +37,7 @@
   </div>
 
   <script>
+    // ---- Helpers ----
     function getRoom(){
       const u = new URL(location.href);
       const q = u.searchParams.get('room');
@@ -44,45 +45,107 @@
       const m = location.pathname.match(/\/live\/([^\/?#]+)/);
       return (m ? m[1] : 'main').replace(/[^\w-]/g,'');
     }
-    const room = getRoom();
-    document.getElementById('roomTitle').textContent = 'Room: ' + room;
-    const link = document.getElementById('link'); link.textContent = location.href;
-
-    fetch('/api/ensure-viewer', { method:'POST', credentials:'include' })
-      .then(()=> startWS())
-      .catch(()=> location.href='/static/index.html');
-
     function addLine(text, cls=''){
       const log = document.getElementById('log');
       const p = document.createElement('div'); p.textContent = text;
       if (cls) p.className = cls; log.appendChild(p); log.scrollTop = log.scrollHeight;
     }
 
-    function startWS(){
-      const origin = location.origin.replace(/^http/,'ws');
-      const ws = new WebSocket(`${origin}/ws/${room}`);
-      const frame = document.getElementById('frame');
-      ws.addEventListener('open', () => addLine('Terhubung ke streaming…', 'sys'));
-      ws.addEventListener('close', () => addLine('Koneksi terputus.', 'sys'));
-      ws.send(JSON.stringify({ t:'sys', text:'viewer_enter' }));
+    // ---- Init ----
+    const room = getRoom();
+    document.getElementById('roomTitle').textContent = 'Room: ' + room;
+    document.getElementById('link').textContent = location.href;
 
-      ws.addEventListener('message', ev => {
-        try {
-          const msg = JSON.parse(ev.data);
-          if (msg.t === 'f') frame.src = msg.d;
-          else if (msg.t === 'c') addLine((msg.user||'anon') + ': ' + msg.text);
-          else if (msg.t === 'sys') addLine(msg.text, 'sys');
-        } catch (_) {}
+    // Viewer perlu session cookie (backend-mu sudah ada /api/ensure-viewer)
+    fetch('/api/ensure-viewer', { method:'POST', credentials:'include' })
+      .then(()=> startWebRTCViewer())
+      .catch(()=> location.href='/static/index.html');
+
+    async function startWebRTCViewer(){
+      const ICE = [{urls:'stun:stun.l.google.com:19302'}];
+      const videoEl = document.getElementById('frame');
+
+      // PeerConnection viewer
+      const pc = new RTCPeerConnection({ iceServers: ICE });
+      let wsSig=null, dc=null;
+
+      // Terima media dari host
+      pc.ontrack = (ev)=>{
+        const [stream] = ev.streams;
+        videoEl.srcObject = stream;
+      };
+
+      // Terima DataChannel chat dari host
+      pc.ondatachannel = (ev)=>{
+        dc = ev.channel;
+        dc.onopen = ()=> addLine('Chat tersambung.', 'sys');
+        dc.onmessage = (e)=> addLine(e.data);
+      };
+
+      // Kirim ICE kandidat viewer -> host via WS
+      pc.onicecandidate = (ev)=>{
+        if (ev.candidate){
+          wsSig?.send(JSON.stringify({ t:'ice', candidate: ev.candidate }));
+        }
+      };
+
+      // ---- Signaling via WS (pakai channel ws/:room yang sudah ada) ----
+      const origin = location.origin.replace(/^http/,'ws');
+      wsSig = new WebSocket(`${origin}/ws/${room}`);
+
+      wsSig.addEventListener('open', ()=>{
+        addLine('Terhubung ke signaling…', 'sys');
+        // Beri tahu host kita siap; actual SDP akan datang dari host
+        wsSig.send(JSON.stringify({ t:'sys', text:'viewer_enter' }));
       });
 
-      document.getElementById('form').addEventListener('submit', e => {
+      wsSig.addEventListener('close', ()=>{
+        addLine('Koneksi signaling terputus.', 'sys');
+      });
+
+      wsSig.addEventListener('message', async (ev)=>{
+        try{
+          const msg = JSON.parse(ev.data);
+
+          // Host broadcast offer -> viewer buat answer
+          if (msg.t === 'offer' && msg.sdp){
+            await pc.setRemoteDescription(new RTCSessionDescription({type:'offer', sdp: msg.sdp}));
+            const ans = await pc.createAnswer();
+            await pc.setLocalDescription(ans);
+            wsSig.send(JSON.stringify({ t:'answer', sdp: ans.sdp }));
+            addLine('Negosiasi WebRTC: offer diterima, answer dikirim.', 'sys');
+          }
+          // ICE dari host
+          else if (msg.t === 'ice' && msg.candidate){
+            try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(_){}
+          }
+          // Chat via WS lama (fallback) — tetap dukung untuk kompatibilitas
+          else if (msg.t === 'c'){
+            addLine((msg.user||'anon') + ': ' + msg.text);
+          }
+          else if (msg.t === 'sys'){
+            addLine(msg.text, 'sys');
+          }
+        }catch(_){}
+      });
+
+      // Form chat (viewer -> host) lewat DataChannel jika tersedia
+      document.getElementById('form').addEventListener('submit', (e)=>{
         e.preventDefault();
         const name = document.getElementById('name').value.trim() || 'viewer';
         const text = document.getElementById('msg').value.trim();
         if (!text) return;
-        ws.send(JSON.stringify({ t:'c', room, user:name, text }));
-        addLine('(me) ' + name + ': ' + text, 'me');
-        document.getElementById('msg').value = '';
+
+        if (dc && dc.readyState === 'open'){
+          dc.send(`${name}: ${text}`);
+          addLine('(me) ' + name + ': ' + text, 'me');
+          document.getElementById('msg').value = '';
+        } else {
+          // fallback: kirim via WS (akan muncul sebagai chat lama)
+          wsSig?.send(JSON.stringify({ t:'c', room, user:name, text }));
+          addLine('(me/ws) ' + name + ': ' + text, 'me');
+          document.getElementById('msg').value = '';
+        }
       });
     }
   </script>
