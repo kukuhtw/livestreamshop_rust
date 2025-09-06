@@ -26,7 +26,7 @@ Sebelumnya, banyak penjual bergantung pada platform seperti TikTok atau Shopee u
 
 Lihat demo penggunaan LiveStreamShop langsung di video berikut yang menunjukkan alur live streaming dengan chat, interaksi, hingga proses checkout:
 
-[[LiveStreamShop Rust Demo]()](https://www.youtube.com/watch?v=oojtmtgQ1vI)
+\[[LiveStreamShop Rust Demo]()]\([https://www.youtube.com/watch?v=oojtmtgQ1vI](https://www.youtube.com/watch?v=oojtmtgQ1vI))
 
 *(Catatan: jika video gagal memuat, coba akses langsung di YouTube dengan tautan `https://www.youtube.com/watch?v=oojtmtgQ1vI`.)*
 
@@ -37,7 +37,16 @@ Lihat demo penggunaan LiveStreamShop langsung di video berikut yang menunjukkan 
 * **Backend**: Rust (Axum, Tokio, SQLx)
 * **Frontend**: HTML, CSS, JavaScript
 * **Database**: MySQL / PostgreSQL (direncanakan)
-* **Video**: WebRTC / Media APIs (direncanakan)
+* **Video**: Saat ini menggunakan **HTML5 `<video>` + Media APIs** sederhana
+  (⚠️ **WebRTC** masih dalam tahap rencana implementasi untuk mendukung skala besar).
+
+---
+
+## Keterbatasan Versi Saat Ini
+
+* 🚧 **Jumlah viewer masih terbatas** (belum optimal untuk ribuan penonton sekaligus).
+* 🚧 **Belum ada dukungan WebRTC** → artinya kualitas streaming dan skalabilitas masih sederhana, cocok untuk demo atau penggunaan kecil-menengah.
+* 🚧 **Fitur lanjutan** seperti multi-host streaming, integrasi pembayaran otomatis, dan optimasi server distribusi konten (CDN) masih dalam roadmap.
 
 ---
 
@@ -151,4 +160,4 @@ Kontribusi sangat disambut!
 
 Proyek ini dilisensikan di bawah **Apache 2.0 License**—bebas digunakan, modifikasi, dan disebarkan.
 
--
+---
