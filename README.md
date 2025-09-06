@@ -26,7 +26,7 @@ Sebelumnya, banyak penjual bergantung pada platform seperti TikTok atau Shopee u
 
 Lihat demo penggunaan LiveStreamShop langsung di video berikut yang menunjukkan alur live streaming dengan chat, interaksi, hingga proses checkout:
 
-[LiveStreamShop Rust Demo]()
+[[LiveStreamShop Rust Demo]()](https://www.youtube.com/watch?v=oojtmtgQ1vI)
 
 *(Catatan: jika video gagal memuat, coba akses langsung di YouTube dengan tautan `https://www.youtube.com/watch?v=oojtmtgQ1vI`.)*
 
