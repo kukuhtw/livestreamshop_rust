@@ -55,8 +55,23 @@ cd livestreamshop_rust
 Tambahkan file `.env` dengan konfigurasi seperti:
 
 ```env
-DATABASE_URL=mysql://user:password@localhost/livestreamshop
-RUST_LOG=info
+# Port aplikasi (default 3030 jika tidak diisi)
+PORT=3030
+
+# Database MySQL
+DATABASE_URL=mysql://root:password@127.0.0.1:3306/livestream_shop?ssl-mode=DISABLED
+
+# Session cookie
+SESSION_COOKIE_NAME=sid
+
+# Upload directory (lokasi file disimpan di server)
+UPLOAD_DIR=../webapp/uploads
+
+# URL publik untuk akses file upload
+PUBLIC_BASE_URL=/static/uploads
+
+# Nama aplikasi
+APP_NAME="Live Stream Shop"
 ```
 
 ### 3. Jalankan Server
